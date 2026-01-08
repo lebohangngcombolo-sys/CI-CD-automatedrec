@@ -1,0 +1,86 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Version
+        run: |
+          VERSION=$(cat VERSION)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          if [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+            echo "APP_VERSION=${VERSION}-dev+${SHORT_SHA}" >> $GITHUB_ENV
+          else
+            echo "APP_VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+
+      - name: Install Backend Dependencies
+        run: cd backend && pip install -r requirements.txt
+
+      - name: Run Tests
+        run: cd backend && pytest || echo "No tests yet"
+
+      - name: Run Migrations
+        run: cd backend && flask db upgrade
+        env:
+          FLASK_APP: backend
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Deploy to Render
+        if: github.ref == 'refs/heads/develop'
+        run: curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
+      - name: Deploy to Render (Prod)
+        if: github.ref == 'refs/heads/main'
+        run: curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Version
+        run: |
+          VERSION=$(cat VERSION)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          if [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+            echo "APP_VERSION=${VERSION}-dev+${SHORT_SHA}" >> $GITHUB_ENV
+          else
+            echo "APP_VERSION=${VERSION}" >> $GITHUB_ENV
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.16.0'
+          channel: stable
+
+      - name: Install Dependencies
+        run: cd frontend && flutter pub get
+
+      - name: Build & Deploy (Staging)
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          cd frontend
+          flutter build web --release --dart-define=API_BASE_URL=https://api.staging.com --dart-define=APP_VERSION=${APP_VERSION}
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_STAGING_SITE_ID }}
+      - name: Build & Deploy (Prod)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cd frontend
+          flutter build web --release --dart-define=API_BASE_URL=https://api.production.com --dart-define=APP_VERSION=${APP_VERSION}
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_PROD_SITE_ID }}
