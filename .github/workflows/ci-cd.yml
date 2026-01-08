@@ -240,6 +240,7 @@ jobs:
           FLASK_APP: app:create_app
           FLASK_ENV: production
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
       - name: Deploy Backend to Render (Production)
         run: curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"

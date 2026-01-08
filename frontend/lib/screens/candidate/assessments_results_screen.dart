@@ -42,7 +42,8 @@ class _AssessmentResultsPageState extends State<AssessmentResultsPage> {
     setState(() => loading = true);
     try {
       final res = await http.get(
-        Uri.parse('http://127.0.0.1:5000/api/candidate/applications'),
+        Uri.parse(
+            'https://ci-cd-automatedrec.onrender.com/api/candidate/applications'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token'
