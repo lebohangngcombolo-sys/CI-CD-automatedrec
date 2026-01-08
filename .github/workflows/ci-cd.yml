@@ -22,6 +22,32 @@ jobs:
   backend-ci:
     name: Backend CI
     runs-on: ubuntu-latest
+    
+    # Add PostgreSQL and Redis services
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: recruitment_test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
 
     steps:
       - uses: actions/checkout@v4
@@ -41,20 +67,49 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Wait for PostgreSQL to be ready
+        run: |
+          for i in {1..10}; do
+            if pg_isready -h localhost -p 5432; then
+              echo "PostgreSQL is ready!"
+              break
+            fi
+            echo "Waiting for PostgreSQL... ($i/10)"
+            sleep 2
+          done
+
+      - name: Wait for Redis to be ready
+        run: |
+          for i in {1..10}; do
+            if redis-cli -h localhost -p 6379 ping | grep -q PONG; then
+              echo "Redis is ready!"
+              break
+            fi
+            echo "Waiting for Redis... ($i/10)"
+            sleep 2
+          done
+
       - name: Install Backend Dependencies
         run: |
           cd backend
           pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest pytest-cov pytest-flask pytest-mock
 
       - name: Run Backend Tests (Blocking)
         working-directory: backend
         env:
           PYTHONPATH: ${{ github.workspace }}/backend
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          FLASK_ENV: testing
+          DATABASE_URL: postgresql://test_user:test_password@localhost:5432/recruitment_test_db
+          REDIS_URL: redis://localhost:6379/0
+          TESTING: 'true'
+          SECRET_KEY: 'test-secret-key-for-ci'
+          JWT_SECRET_KEY: 'test-jwt-secret-for-ci'
         run: |
-          pytest --cov=app --cov-report=term-missing
-
+          # Create test database tables and run tests
+          python -m pytest test/ -v --cov=app --cov-report=term-missing
 
 # -------------------------
 # CI: FRONTEND VALIDATION
