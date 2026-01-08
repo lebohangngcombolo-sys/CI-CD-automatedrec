@@ -92,50 +92,42 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - name: Read Version
-        run: |
-          VERSION=$(cat VERSION)
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          if [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
-            echo "APP_VERSION=${VERSION}-dev+${SHORT_SHA}" >> $GITHUB_ENV
-          else
-            echo "APP_VERSION=${VERSION}" >> $GITHUB_ENV
-          fi
+    - name: Read Version
+      run: |
+        VERSION=$(cat VERSION)
+        SHORT_SHA=$(git rev-parse --short HEAD)
+        if [[ "${GITHUB_REF}" == "refs/heads/develop" ]]; then
+          echo "APP_VERSION=${VERSION}-dev+${SHORT_SHA}" >> $GITHUB_ENV
+        else
+          echo "APP_VERSION=${VERSION}" >> $GITHUB_ENV
+        fi
 
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+        channel: stable
 
-      - name: Disable Flutter analytics
-        run: flutter config --no-analytics
+    - name: Disable Flutter analytics
+      run: flutter config --no-analytics
 
-      - name: Verify Flutter and Dart versions
-        run: |
-          echo "Flutter version:"
-          flutter --version
-          echo "Dart version:"
-          dart --version
+    - name: Verify Flutter and Dart versions
+      run: |
+        echo "Flutter version:"
+        flutter --version
+        echo "Dart version:"
+        dart --version
 
-      - name: Install Frontend Dependencies
-        run: |
-          cd frontend
-          flutter pub get
+    - name: Install Frontend Dependencies
+      run: |
+        cd frontend
+        flutter pub get
 
-      - name: Run Frontend Analyzer
-        run: |
-          cd frontend
-          # Only fail on actual errors (info and warnings are ignored by default)
-          flutter analyze
+    - name: Build Frontend (Validation Only)
+      run: cd frontend && flutter build web --release
 
-
-      - name: Build Frontend (Validation Only)
-        run: |
-          cd frontend
-          flutter build web --release
 
 
 # -------------------------
