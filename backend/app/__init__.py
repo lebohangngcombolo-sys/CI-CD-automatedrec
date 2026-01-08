@@ -5,15 +5,18 @@ from .extensions import (
     migrate, cors, bcrypt, oauth, limiter
 )
 from .models import *
-from .routes import auth, admin_routes, candidate_routes, ai_routes, mfa_routes, sso_routes, analytics_routes  # import sso_routes
+from .routes import auth, admin_routes, candidate_routes, ai_routes, mfa_routes, sso_routes, analytics_routes
+from .config import config  # <-- import the config dictionary
 
 def create_app(config_name=None):
     app = Flask(__name__)
 
     # Pick config dynamically
     if config_name is None:
-        config_name = os.getenv("FLASK_ENV", "production").capitalize()
-    app.config.from_object(f"app.config.{config_name}Config")
+        config_name = os.getenv("FLASK_ENV", "production").lower()
+
+    # Use dictionary to fetch the config class
+    app.config.from_object(config.get(config_name, config['production']))
 
     # ---------------- Initialize Extensions ----------------
     db.init_app(app)
@@ -26,7 +29,7 @@ def create_app(config_name=None):
     limiter.init_app(app)
     cors.init_app(
         app,
-        origins=["*"],  # adjust for production
+        origins=["*"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
         supports_credentials=True,

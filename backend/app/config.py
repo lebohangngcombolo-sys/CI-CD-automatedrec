@@ -8,7 +8,7 @@ load_dotenv()
 
 class Config:
     """Base configuration."""
-    
+
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key')
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'jwt-secret-key')
 
@@ -50,27 +50,22 @@ class Config:
     # CV Uploads
     CV_UPLOAD_FOLDER = os.getenv('CV_UPLOAD_FOLDER', 'uploads/cvs')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
-    
+
     # Frontend URL
     FRONTEND_URL = os.getenv('FRONTEND_URL')
     RATELIMIT_STORAGE_URI = "memory://"
-    
+
     # SSO / Auth0
     SSO_CLIENT_ID = os.getenv('SSO_CLIENT_ID')
     SSO_CLIENT_SECRET = os.getenv('SSO_CLIENT_SECRET')
     SSO_METADATA_URL = os.getenv('SSO_METADATA_URL')
     SSO_USERINFO_URL = os.getenv('SSO_USERINFO_URL')
 
-
-    
     # SSO Configuration for Company Hub Integration
     SSO_JWT_SECRET = os.getenv('SSO_JWT_SECRET', 'our-super-secret-code-123')  # Same as hub!
     PORTAL_HUB_URL = os.getenv('PORTAL_HUB_URL', 'http://localhost:5001')  # Hub address
-    
-    
 
 
-    
 class DevelopmentConfig(Config):
     DEBUG = True
 
@@ -86,9 +81,20 @@ class ProductionConfig(Config):
     MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', 'lebohangngcombolo@gmail.com')
 
 
-# Config dictionary
+class TestingConfig(Config):
+    """Configuration for tests."""
+    TESTING = True
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"  # in-memory DB for fast tests
+    MAIL_SUPPRESS_SEND = True  # Don't actually send emails
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)  # shorter expiry for tests
+    RATELIMIT_STORAGE_URI = "memory://"
+
+
+# Config dictionary for dynamic import in create_app()
 config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
+    'testing': TestingConfig,   # <--- added
     'default': DevelopmentConfig
 }
