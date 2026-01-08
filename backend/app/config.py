@@ -82,13 +82,26 @@ class ProductionConfig(Config):
 
 
 class TestingConfig(Config):
-    """Configuration for tests."""
+    """Configuration for tests using PostgreSQL."""
     TESTING = True
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"  # in-memory DB for fast tests
-    MAIL_SUPPRESS_SEND = True  # Don't actually send emails
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)  # shorter expiry for tests
+
+    # PostgreSQL test DB
+    SQLALCHEMY_DATABASE_URI = os.getenv(
+        "TEST_DATABASE_URL", "postgresql://user:password@localhost/recruitment_test_db"
+    )
+    
+    MAIL_SUPPRESS_SEND = True
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=5)
     RATELIMIT_STORAGE_URI = "memory://"
+
+    # Dummy SSO config for tests
+    SSO_CLIENT_ID = "test-client-id"
+    SSO_CLIENT_SECRET = "test-client-secret"
+    SSO_METADATA_URL = "http://localhost/test-metadata"
+    SSO_USERINFO_URL = "http://localhost/test-userinfo"
+    SSO_JWT_SECRET = "test-sso-secret"
+
 
 
 # Config dictionary for dynamic import in create_app()
