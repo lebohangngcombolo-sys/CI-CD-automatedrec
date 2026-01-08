@@ -152,16 +152,29 @@ jobs:
           echo "APP_VERSION=${VERSION}-dev+${SHORT_SHA}" >> $GITHUB_ENV
 
       # ---------- Backend ----------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
       - name: Run Staging Migrations
         run: |
           cd backend
-          flask db upgrade
+          python -m flask db upgrade
         env:
-          FLASK_APP: backend
+          FLASK_APP: app:create_app
+          FLASK_ENV: staging
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
 
       - name: Deploy Backend to Render (Staging)
         run: curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
+
 
       # ---------- Frontend ----------
       - name: Setup Flutter
