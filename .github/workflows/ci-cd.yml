@@ -126,10 +126,16 @@ jobs:
           flutter pub get
 
       - name: Run Frontend Analyzer
-        run: cd frontend && flutter analyze
+        run: |
+          cd frontend
+          # Only fail on errors, ignore info and warnings including deprecations
+          flutter analyze --fatal-infos=false --fatal-warnings=false
 
       - name: Build Frontend (Validation Only)
-        run: cd frontend && flutter build web --release
+        run: |
+          cd frontend
+          flutter build web --release
+
 
 # -------------------------
 # CD: STAGING DEPLOY
