@@ -29,3 +29,8 @@ sendgrid
 bleach
 flask-limiter
 
+pytest
+pytest-flask
+pytest-cov
+pytest-mock
+
