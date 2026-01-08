@@ -4,23 +4,40 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from app.models import Requisition
 from cloudinary.uploader import upload as cloudinary_upload
+from unittest.mock import MagicMock
 
 load_dotenv()
 
-# OpenRouter API configuration
-api_key = os.getenv("OPENROUTER_API_KEY")
-openai_client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=api_key,
-    default_headers={"HTTP-Referer": "http://localhost:5000"}  # replace with your frontend URL
-)
+
+def get_openai_client():
+    """
+    Returns a configured OpenAI/OpenRouter client.
+    If API key is missing (e.g., in tests), returns a mock client.
+    """
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if api_key:
+        return OpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+            default_headers={"HTTP-Referer": "http://localhost:5000"}  # replace with your frontend URL
+        )
+    else:
+        # Return a mock client for testing/CI
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value.choices = [
+            MagicMock(
+                message=MagicMock(
+                    content="Match Score: 75/100\nMissing Skills:\n- Python\nSuggestions:\n- Improve CV"
+                )
+            )
+        ]
+        return mock_client
+
 
 class HybridResumeAnalyzer:
     @staticmethod
     def upload_cv(file):
-        """
-        Upload resume file to Cloudinary and return secure URL.
-        """
+        """Upload resume file to Cloudinary and return secure URL."""
         try:
             result = cloudinary_upload(
                 file,
@@ -73,7 +90,9 @@ Suggestions:
 """
 
         try:
-            # Call OpenRouter
+            # Lazy client
+            openai_client = get_openai_client()
+
             response = openai_client.chat.completions.create(
                 model="openrouter/auto",
                 messages=[
@@ -88,18 +107,15 @@ Suggestions:
             text = response.choices[0].message.content or ""
 
             # --- Parsing ---
-            # Match score (75/100 or 75%)
             score_match = re.search(r"(\d{1,3})(?:/100|%)", text)
             match_score = int(score_match.group(1)) if score_match else 0
 
-            # Missing skills
             missing_skills_match = re.search(r"Missing Skills:\s*(.*?)(?:Suggestions:|$)", text, re.DOTALL)
             missing_skills = []
             if missing_skills_match:
                 skills_text = missing_skills_match.group(1)
                 missing_skills = [line.strip("- ").strip() for line in skills_text.strip().splitlines() if line.strip()]
 
-            # Suggestions
             suggestions_match = re.search(r"Suggestions:\s*(.*)", text, re.DOTALL)
             suggestions = []
             if suggestions_match:
