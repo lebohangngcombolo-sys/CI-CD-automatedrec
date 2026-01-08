@@ -128,8 +128,9 @@ jobs:
       - name: Run Frontend Analyzer
         run: |
           cd frontend
-          # Only fail on errors, ignore info and warnings including deprecations
-          flutter analyze --fatal-infos=false --fatal-warnings=false
+          # Only fail on actual errors (info and warnings are ignored by default)
+          flutter analyze
+
 
       - name: Build Frontend (Validation Only)
         run: |
