@@ -13,7 +13,8 @@ on:
 
 env:
   PYTHON_VERSION: "3.11"
-  FLUTTER_VERSION: "3.16.0"
+  # Updated to a Flutter version with Dart SDK >= 3.6.2
+  FLUTTER_VERSION: "3.22.0"  # This includes Dart 3.4.0
 
 # -------------------------
 # CI: BACKEND VALIDATION
@@ -106,11 +107,17 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
+          # Updated to use the new Flutter version
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
 
+      - name: Disable Flutter analytics
+        run: flutter config --no-analytics
+
       - name: Install Frontend Dependencies
-        run: cd frontend && flutter pub get
+        run: |
+          cd frontend
+          flutter pub get
 
       - name: Run Frontend Analyzer
         run: cd frontend && flutter analyze
