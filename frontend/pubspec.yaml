@@ -78,7 +78,7 @@ flutter:
     - assets/images/team5.jpg
     - assets/images/final.jpg
     - assets/icons/LinkedIn1.png
-    - assets/icons/Linkedin.png
+    - assets/icons/LinkedIn.png
     - assets/icons/Instagram1.png
     - assets/icons/Instagram.png
     - assets/icons/facebook.png
@@ -127,4 +127,4 @@ flutter:
     - assets/icons/khono.png
     - assets/images/logo3.png
     - assets/images/default.jpeg
-    - assets/icons/Linkedin.png
+    # - assets/icons/Linkedin.png
