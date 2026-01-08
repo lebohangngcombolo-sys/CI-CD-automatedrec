@@ -169,7 +169,7 @@ jobs:
           python -m flask db upgrade
         env:
           FLASK_APP: app:create_app
-          FLASK_ENV: staging
+          FLASK_ENV: rec secrets
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
 
