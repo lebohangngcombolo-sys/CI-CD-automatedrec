@@ -262,7 +262,7 @@ class LandingPage extends StatelessWidget {
                             'https://x.com/yourprofile',
                           ),
                           _socialIcon(
-                            'assets/icons/Linkedin.png',
+                            'assets/icons/LinkedIn.png',
                             'https://www.linkedin.com/in/yourprofile',
                           ),
                           _socialIcon(
@@ -356,7 +356,7 @@ class LandingPage extends StatelessWidget {
                             'https://x.com/yourprofile',
                           ),
                           _socialIcon(
-                            'assets/icons/Linkedin1.png',
+                            'assets/icons/LinkedIn1.png',
                             'https://www.linkedin.com/in/yourprofile',
                           ),
                           _socialIcon(

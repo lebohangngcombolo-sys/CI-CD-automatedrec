@@ -5,14 +5,18 @@ from .extensions import (
     migrate, cors, bcrypt, oauth, limiter
 )
 from .models import *
-from .routes import auth, admin_routes, candidate_routes, ai_routes, mfa_routes, sso_routes, analytics_routes  # import sso_routes
+from .routes import auth, admin_routes, candidate_routes, ai_routes, mfa_routes, sso_routes, analytics_routes
+from .config import config  # <-- import the config dictionary
 
-def create_app():
+def create_app(config_name=None):
     app = Flask(__name__)
 
     # Pick config dynamically
-    config_name = os.getenv("FLASK_ENV", "production").capitalize()
-    app.config.from_object(f"app.config.{config_name}Config")
+    if config_name is None:
+        config_name = os.getenv("FLASK_ENV", "production").lower()
+
+    # Use dictionary to fetch the config class
+    app.config.from_object(config.get(config_name, config['production']))
 
     # ---------------- Initialize Extensions ----------------
     db.init_app(app)
@@ -25,23 +29,21 @@ def create_app():
     limiter.init_app(app)
     cors.init_app(
         app,
-        origins=["*"],  # adjust for production
+        origins=["*"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
         supports_credentials=True,
     )
 
     # ---------------- Register Blueprints ----------------
-    auth.init_auth_routes(app)  # existing auth routes
+    auth.init_auth_routes(app)
     app.register_blueprint(admin_routes.admin_bp, url_prefix="/api/admin")
     app.register_blueprint(candidate_routes.candidate_bp, url_prefix="/api/candidate")
     app.register_blueprint(ai_routes.ai_bp)
-    app.register_blueprint(mfa_routes.mfa_bp, url_prefix="/api/auth")  # MFA routes
+    app.register_blueprint(mfa_routes.mfa_bp, url_prefix="/api/auth")
     app.register_blueprint(analytics_routes.analytics_bp, url_prefix="/api")
-
-    # ---------------- Register SSO Blueprint ----------------
-    sso_routes.register_sso_provider(app)      # initialize Auth0 / SSO provider
-    app.register_blueprint(sso_routes.sso_bp)  # SSO routes
+    sso_routes.register_sso_provider(app)
+    app.register_blueprint(sso_routes.sso_bp)
 
     # ---------------- Health Check Route ----------------
     @app.route("/api/health")
@@ -51,8 +53,6 @@ def create_app():
     # ---------------- Version Endpoint ----------------
     @app.route("/version")
     def version():
-        """Returns the current app version from environment variable."""
         return jsonify({"version": os.getenv("APP_VERSION", "unknown")})
 
     return app
-
