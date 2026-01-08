@@ -3,12 +3,26 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - main
       - develop
+      - main
+  pull_request:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
 
+env:
+  PYTHON_VERSION: "3.11"
+  FLUTTER_VERSION: "3.16.0"
+
+# -------------------------
+# CI: BACKEND VALIDATION
+# -------------------------
 jobs:
-  backend:
+  backend-ci:
+    name: Backend CI
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -20,33 +34,31 @@ jobs:
             echo "APP_VERSION=${VERSION}-dev+${SHORT_SHA}" >> $GITHUB_ENV
           else
             echo "APP_VERSION=${VERSION}" >> $GITHUB_ENV
+          fi
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: 3.11
+          python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install Backend Dependencies
-        run: cd backend && pip install -r requirements.txt
+        run: |
+          cd backend
+          pip install --upgrade pip
+          pip install -r requirements.txt
 
-      - name: Run Tests
-        run: cd backend && pytest || echo "No tests yet"
+      - name: Run Backend Tests (Blocking)
+        run: |
+          cd backend
+          pytest --cov=app --cov-report=term-missing
 
-      - name: Run Migrations
-        run: cd backend && flask db upgrade
-        env:
-          FLASK_APP: backend
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      - name: Deploy to Render
-        if: github.ref == 'refs/heads/develop'
-        run: curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
-      - name: Deploy to Render (Prod)
-        if: github.ref == 'refs/heads/main'
-        run: curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
-
-  frontend:
+# -------------------------
+# CI: FRONTEND VALIDATION
+# -------------------------
+  frontend-ci:
+    name: Frontend CI
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -58,29 +70,128 @@ jobs:
             echo "APP_VERSION=${VERSION}-dev+${SHORT_SHA}" >> $GITHUB_ENV
           else
             echo "APP_VERSION=${VERSION}" >> $GITHUB_ENV
+          fi
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.16.0'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
 
-      - name: Install Dependencies
+      - name: Install Frontend Dependencies
         run: cd frontend && flutter pub get
 
-      - name: Build & Deploy (Staging)
-        if: github.ref == 'refs/heads/develop'
+      - name: Run Frontend Analyzer
+        run: cd frontend && flutter analyze
+
+      - name: Build Frontend (Validation Only)
+        run: cd frontend && flutter build web --release
+
+# -------------------------
+# CD: STAGING DEPLOY
+# -------------------------
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs:
+      - backend-ci
+      - frontend-ci
+    if: github.ref == 'refs/heads/develop'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Version
+        run: |
+          VERSION=$(cat VERSION)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          echo "APP_VERSION=${VERSION}-dev+${SHORT_SHA}" >> $GITHUB_ENV
+
+      # ---------- Backend ----------
+      - name: Run Staging Migrations
+        run: |
+          cd backend
+          flask db upgrade
+        env:
+          FLASK_APP: backend
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+
+      - name: Deploy Backend to Render (Staging)
+        run: curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
+
+      # ---------- Frontend ----------
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Build Frontend (Staging)
         run: |
           cd frontend
-          flutter build web --release --dart-define=API_BASE_URL=https://api.staging.com --dart-define=APP_VERSION=${APP_VERSION}
+          flutter build web --release \
+            --dart-define=API_BASE_URL=https://api.staging.com \
+            --dart-define=APP_VERSION=${APP_VERSION}
+
+      - name: Deploy Frontend to Netlify (Staging)
+        run: |
+          npm install -g netlify-cli
+          netlify deploy \
+            --dir=frontend/build/web \
+            --site=${{ secrets.NETLIFY_STAGING_SITE_ID }} \
+            --auth=${{ secrets.NETLIFY_AUTH_TOKEN }} \
+            --prod
+
+# -------------------------
+# CD: PRODUCTION DEPLOY
+# -------------------------
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs:
+      - backend-ci
+      - frontend-ci
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read Version
+        run: |
+          VERSION=$(cat VERSION)
+          echo "APP_VERSION=${VERSION}" >> $GITHUB_ENV
+
+      # ---------- Backend ----------
+      - name: Run Production Migrations
+        run: |
+          cd backend
+          flask db upgrade
         env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_STAGING_SITE_ID }}
-      - name: Build & Deploy (Prod)
-        if: github.ref == 'refs/heads/main'
+          FLASK_APP: backend
+          DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+
+      - name: Deploy Backend to Render (Production)
+        run: curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
+
+      # ---------- Frontend ----------
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+
+      - name: Build Frontend (Production)
         run: |
           cd frontend
-          flutter build web --release --dart-define=API_BASE_URL=https://api.production.com --dart-define=APP_VERSION=${APP_VERSION}
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_PROD_SITE_ID }}
+          flutter build web --release \
+            --dart-define=API_BASE_URL=https://api.production.com \
+            --dart-define=APP_VERSION=${APP_VERSION}
+
+      - name: Deploy Frontend to Netlify (Production)
+        run: |
+          npm install -g netlify-cli
+          netlify deploy \
+            --dir=frontend/build/web \
+            --site=${{ secrets.NETLIFY_PROD_SITE_ID }} \
+            --auth=${{ secrets.NETLIFY_AUTH_TOKEN }} \
+            --prod
