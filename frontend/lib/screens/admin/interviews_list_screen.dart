@@ -104,6 +104,7 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
   }
 
   void showRescheduleDialog(int id) async {
+    // Pick the date
     DateTime? picked = await showDatePicker(
       context: context,
       firstDate: DateTime.now(),
@@ -111,10 +112,16 @@ class _InterviewListScreenState extends State<InterviewListScreen> {
       initialDate: DateTime.now(),
     );
 
+    // If the user canceled, exit early
+    if (picked == null) return;
+
+    // Pick the time
     final time = await showTimePicker(
       context: context,
       initialTime: TimeOfDay.now(),
     );
+
+    // If the user picked a time, combine date + time
     if (time != null) {
       final newDateTime = DateTime(
         picked.year,
