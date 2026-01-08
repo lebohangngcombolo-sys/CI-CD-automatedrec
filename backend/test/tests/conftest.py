@@ -1,8 +1,6 @@
 import pytest
 from flask_jwt_extended import create_access_token
 from unittest.mock import MagicMock
-import sys
-
 from app import create_app, db
 from app.models import User
 
@@ -11,6 +9,7 @@ from app.models import User
 # -----------------------------
 @pytest.fixture(scope="session")
 def app():
+    """Create and yield a Flask app for testing."""
     app = create_app("testing")
     with app.app_context():
         db.create_all()
@@ -20,6 +19,7 @@ def app():
 
 @pytest.fixture(scope="function")
 def client(app):
+    """Return a test client for the app."""
     return app.test_client()
 
 
@@ -31,6 +31,7 @@ def clean_db(app):
     for table in reversed(db.metadata.sorted_tables):
         db.session.execute(table.delete())
     db.session.commit()
+
 
 # -----------------------------
 # User fixtures
@@ -45,7 +46,7 @@ def admin_user(app):
     db.session.add(admin)
     db.session.commit()
 
-    # JWT must be created within app context
+    # JWT token must be created within app context
     admin.token = create_access_token(identity=admin.id)
     return admin
 
@@ -63,15 +64,18 @@ def hr_user(app):
     hr.token = create_access_token(identity=hr.id)
     return hr
 
+
 # -----------------------------
 # OpenAI Mock Fixture (Autouse)
 # -----------------------------
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="function", autouse=True)
 def mock_openai(monkeypatch):
     """
-    Globally mock OpenAI client for all tests to prevent API calls.
+    Mock OpenAI client for all tests to prevent actual API calls.
     """
-    mock_client = MagicMock()
-    monkeypatch.setattr("app.services.cv_parser_service.OpenAI", lambda *a, **kw: mock_client)
-    return mock_client
+    from app.services import cv_parser_service
 
+    mock_client = MagicMock()
+    # Replace OpenAI with mock in the service module
+    monkeypatch.setattr(cv_parser_service, "OpenAI", lambda *args, **kwargs: mock_client)
+    return mock_client
