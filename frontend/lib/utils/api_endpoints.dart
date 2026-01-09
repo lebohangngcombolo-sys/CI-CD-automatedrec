@@ -1,10 +1,12 @@
 class ApiEndpoints {
   // ------------------- Base URLs -------------------
-  static const authBase = "http://127.0.0.1:5000/api/auth";
-  static const candidateBase = "http://127.0.0.1:5000/api/candidate";
-  static const adminBase = "http://127.0.0.1:5000/api/admin";
-  static const chatbotBase = "http://127.0.0.1:5000/api/chatbot";
-  static const hmBase = "http://127.0.0.1:5000/api/admin";
+  static const authBase = "https://ci-cd-automatedrec.onrender.com/api/auth";
+  static const candidateBase =
+      "https://ci-cd-automatedrec.onrender.com/api/candidate";
+  static const adminBase = "https://ci-cd-automatedrec.onrender.com/api/admin";
+  static const chatbotBase =
+      "https://ci-cd-automatedrec.onrender.com/api/chatbot";
+  static const hmBase = "https://ci-cd-automatedrec.onrender.com/api/admin";
 
   // ------------------- Auth -------------------
   static const register = "$authBase/register";

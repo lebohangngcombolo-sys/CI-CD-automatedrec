@@ -141,6 +141,7 @@ jobs:
       - backend-ci
       - frontend-ci
     if: github.ref == 'refs/heads/develop'
+    environment: staging
 
     steps:
       - uses: actions/checkout@v4
@@ -152,16 +153,40 @@ jobs:
           echo "APP_VERSION=${VERSION}-dev+${SHORT_SHA}" >> $GITHUB_ENV
 
       # ---------- Backend ----------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
       - name: Run Staging Migrations
         run: |
           cd backend
-          flask db upgrade
+          if [ -z "$DATABASE_URL" ]; then
+            echo "⚠️ DATABASE_URL not set. Skipping migrations."
+            exit 0
+          fi
+          python -m flask db upgrade
         env:
-          FLASK_APP: backend
+          FLASK_APP: app:create_app
+          FLASK_ENV: production
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || '' }}
 
       - name: Deploy Backend to Render (Staging)
-        run: curl -X POST "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}"
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "⚠️ RENDER_STAGING_DEPLOY_HOOK not set. Skipping backend deployment."
+            exit 0
+          fi
+          curl -X POST "$DEPLOY_HOOK"
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}
 
       # ---------- Frontend ----------
       - name: Setup Flutter
@@ -174,16 +199,24 @@ jobs:
           cd frontend
           flutter build web --release \
             --dart-define=API_BASE_URL=https://api.staging.com \
-            --dart-define=APP_VERSION=${APP_VERSION}
+            --dart-define=APP_VERSION=${APP_VERSION} \
+            --no-tree-shake-icons
 
       - name: Deploy Frontend to Netlify (Staging)
         run: |
+          if [ -z "$NETLIFY_SITE_ID" ] || [ -z "$NETLIFY_AUTH_TOKEN" ]; then
+            echo "⚠️ Netlify secrets not set. Skipping frontend deployment."
+            exit 0
+          fi
           npm install -g netlify-cli
           netlify deploy \
             --dir=frontend/build/web \
-            --site=${{ secrets.NETLIFY_STAGING_SITE_ID }} \
-            --auth=${{ secrets.NETLIFY_AUTH_TOKEN }} \
+            --site=$NETLIFY_SITE_ID \
+            --auth=$NETLIFY_AUTH_TOKEN \
             --prod
+        env:
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_STAGING_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
 
 # -------------------------
 # CD: PRODUCTION DEPLOY
@@ -207,16 +240,40 @@ jobs:
           echo "APP_VERSION=${VERSION}" >> $GITHUB_ENV
 
       # ---------- Backend ----------
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
       - name: Run Production Migrations
         run: |
           cd backend
-          flask db upgrade
+          if [ -z "$DATABASE_URL" ]; then
+            echo "⚠️ DATABASE_URL not set. Skipping migrations."
+            exit 0
+          fi
+          python -m flask db upgrade
         env:
-          FLASK_APP: backend
+          FLASK_APP: app:create_app
+          FLASK_ENV: production
           DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY || '' }}
 
       - name: Deploy Backend to Render (Production)
-        run: curl -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}"
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "⚠️ RENDER_PROD_DEPLOY_HOOK not set. Skipping backend deployment."
+            exit 0
+          fi
+          curl -X POST "$DEPLOY_HOOK"
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_PROD_DEPLOY_HOOK }}
 
       # ---------- Frontend ----------
       - name: Setup Flutter
@@ -229,13 +286,21 @@ jobs:
           cd frontend
           flutter build web --release \
             --dart-define=API_BASE_URL=https://api.production.com \
-            --dart-define=APP_VERSION=${APP_VERSION}
+            --dart-define=APP_VERSION=${APP_VERSION} \
+            --no-tree-shake-icons
 
       - name: Deploy Frontend to Netlify (Production)
         run: |
+          if [ -z "$NETLIFY_SITE_ID" ] || [ -z "$NETLIFY_AUTH_TOKEN" ]; then
+            echo "⚠️ Netlify secrets not set. Skipping frontend deployment."
+            exit 0
+          fi
           npm install -g netlify-cli
           netlify deploy \
             --dir=frontend/build/web \
-            --site=${{ secrets.NETLIFY_PROD_SITE_ID }} \
-            --auth=${{ secrets.NETLIFY_AUTH_TOKEN }} \
+            --site=$NETLIFY_SITE_ID \
+            --auth=$NETLIFY_AUTH_TOKEN \
             --prod
+        env:
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_PROD_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
