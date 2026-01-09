@@ -34,7 +34,7 @@ class Config:
     MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'True').lower() == 'true'
     MAIL_USERNAME = os.getenv('MAIL_USERNAME', 'apikey')  # 'apikey' literal for SendGrid
     MAIL_PASSWORD = os.getenv('SENDGRID_API_KEY')  # SendGrid API key
-    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', 'no-reply@yourdomain.com')
+    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', 'cyriltrump3@gmail.com')
 
     # OAuth
     GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
@@ -78,7 +78,7 @@ class ProductionConfig(Config):
     MAIL_USERNAME = 'apikey'
     SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY')
     MAIL_PASSWORD = SENDGRID_API_KEY
-    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', 'lebohangngcombolo@gmail.com')
+    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', 'cyriltrump3@gmail.com')
 
 
 class TestingConfig(Config):
