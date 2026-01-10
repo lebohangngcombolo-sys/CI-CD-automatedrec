@@ -1,16 +1,19 @@
 class ApiEndpoints {
   // ------------------- Base URLs -------------------
-  static const authBase = "http://127.0.0.1:5000/api/auth";
-  static const candidateBase = "http://127.0.0.1:5000/api/candidate";
-  static const adminBase = "http://127.0.0.1:5000/api/admin";
-  static const chatbotBase = "http://127.0.0.1:5000/api/chatbot";
-  static const hmBase = "http://127.0.0.1:5000/api/admin";
-  static const chatBase = "http://127.0.0.1:5000/api/chat";
-  static const analyticsBase = "http://127.0.0.1:5000/api/analytics";
-  static const baseUrl = "http://127.0.0.1:5000";
+  static const authBase = "https://ci-cd-automatedrec.onrender.com/api/auth";
+  static const candidateBase =
+      "https://ci-cd-automatedrec.onrender.com/api/candidate";
+  static const adminBase = "https://ci-cd-automatedrec.onrender.com/api/admin";
+  static const chatbotBase =
+      "https://ci-cd-automatedrec.onrender.com/api/chatbot";
+  static const hmBase = "https://ci-cd-automatedrec.onrender.com/api/admin";
+  static const chatBase = "https://ci-cd-automatedrec.onrender.com/api/chat";
+  static const analyticsBase =
+      "https://ci-cd-automatedrec.onrender.com/api/analytics";
+  static const baseUrl = "https://ci-cd-automatedrec.onrender.com";
 
   // NEW: Offer management base URL (matches your Flask blueprint)
-  static const offerBase = "http://127.0.0.1:5000/api/offer";
+  static const offerBase = "https://ci-cd-automatedrec.onrender.com/api/offer";
 
   // WebSocket URL (for real-time chat)
   static const webSocketUrl =

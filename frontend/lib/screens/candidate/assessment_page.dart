@@ -61,7 +61,7 @@ class _AssessmentPageState extends State<AssessmentPage> {
     try {
       final res = await http.get(
         Uri.parse(
-            "http://127.0.0.1:5000/api/candidate/applications/${widget.applicationId}/assessment"),
+            "https://ci-cd-automatedrec.onrender.com/api/candidate/applications/${widget.applicationId}/assessment"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token"
@@ -97,7 +97,7 @@ class _AssessmentPageState extends State<AssessmentPage> {
 
       final res = await http.post(
         Uri.parse(
-            "http://127.0.0.1:5000/api/candidate/applications/${widget.applicationId}/assessment"),
+            "https://ci-cd-automatedrec.onrender.com/api/candidate/applications/${widget.applicationId}/assessment"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token"
@@ -144,7 +144,7 @@ class _AssessmentPageState extends State<AssessmentPage> {
 
       final res = await http.post(
         Uri.parse(
-            "http://127.0.0.1:5000/api/candidate/apply/save_draft/${widget.applicationId}"),
+            "https://ci-cd-automatedrec.onrender.com/api/candidate/apply/save_draft/${widget.applicationId}"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token"

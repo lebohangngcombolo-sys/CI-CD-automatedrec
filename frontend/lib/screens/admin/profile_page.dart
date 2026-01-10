@@ -14,7 +14,8 @@ import '../../widgets/custom_textfield.dart';
 import '../../services/auth_service.dart';
 
 // ------------------- API Base URL -------------------
-const String candidateBase = "http://127.0.0.1:5000/api/candidate";
+const String candidateBase =
+    "https://ci-cd-automatedrec.onrender.com/api/candidate";
 
 class ProfilePage extends StatefulWidget {
   final String token;
@@ -82,7 +83,8 @@ class _ProfilePageState extends State<ProfilePage>
 
   List<dynamic> documents = [];
 
-  final String apiBase = "http://127.0.0.1:5000/api/candidate";
+  final String apiBase =
+      "https://ci-cd-automatedrec.onrender.com/api/candidate";
 
   @override
   void initState() {

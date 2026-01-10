@@ -102,7 +102,8 @@ class _HMMainDashboardState extends State<HMMainDashboard>
   Uint8List? _profileImageBytes;
   String _profileImageUrl = "";
   final ImagePicker _picker = ImagePicker();
-  final String apiBase = "http://127.0.0.1:5000/api/candidate";
+  final String apiBase =
+      "https://ci-cd-automatedrec.onrender.com/api/candidate";
 
   @override
   void initState() {
@@ -221,7 +222,8 @@ class _HMMainDashboardState extends State<HMMainDashboard>
       final token = await AuthService.getAccessToken();
 
       final res = await http.get(
-        Uri.parse("http://127.0.0.1:5000/api/admin/recent-activities"),
+        Uri.parse(
+            "https://ci-cd-automatedrec.onrender.com/api/admin/recent-activities"),
         headers: {"Authorization": "Bearer $token"},
       );
 
@@ -251,7 +253,8 @@ class _HMMainDashboardState extends State<HMMainDashboard>
     try {
       final token = await AuthService.getAccessToken();
       final res = await http.get(
-        Uri.parse("http://127.0.0.1:5000/api/admin/powerbi/status"),
+        Uri.parse(
+            "https://ci-cd-automatedrec.onrender.com/api/admin/powerbi/status"),
         headers: {"Authorization": "Bearer $token"},
       );
 

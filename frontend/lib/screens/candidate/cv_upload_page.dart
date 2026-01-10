@@ -81,7 +81,7 @@ class _CVUploadScreenState extends State<CVUploadScreen> {
 
     try {
       final uri = Uri.parse(
-          'http://127.0.0.1:5000/api/candidate/upload_resume/${widget.applicationId}');
+          'https://ci-cd-automatedrec.onrender.com/api/candidate/upload_resume/${widget.applicationId}');
 
       final request = http.MultipartRequest('POST', uri);
       request.headers['Authorization'] = 'Bearer $token';

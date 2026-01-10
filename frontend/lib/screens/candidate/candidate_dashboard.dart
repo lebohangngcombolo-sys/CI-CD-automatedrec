@@ -83,7 +83,8 @@ class _CandidateDashboardState extends State<CandidateDashboard>
   Uint8List? _profileImageBytes;
   String _profileImageUrl = "";
   final ImagePicker _picker = ImagePicker();
-  final String apiBase = "http://127.0.0.1:5000/api/candidate";
+  final String apiBase =
+      "https://ci-cd-automatedrec.onrender.com/api/candidate";
 
   @override
   void initState() {
@@ -385,7 +386,7 @@ class _CandidateDashboardState extends State<CandidateDashboard>
 
     try {
       final response = await http.post(
-        Uri.parse("http://127.0.0.1:5000/api/ai/chat"),
+        Uri.parse("https://ci-cd-automatedrec.onrender.com/api/ai/chat"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer ${widget.token}",
@@ -430,7 +431,7 @@ class _CandidateDashboardState extends State<CandidateDashboard>
     _safeSetState(() => _isLoading = true);
     try {
       final response = await http.post(
-        Uri.parse("http://127.0.0.1:5000/api/ai/parse_cv"),
+        Uri.parse("https://ci-cd-automatedrec.onrender.com/api/ai/parse_cv"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer ${widget.token}",

@@ -175,7 +175,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
     try {
       final res = await http.get(
         Uri.parse(
-            "http://127.0.0.1:5000/api/candidate/applications/$applicationId/draft"),
+            "https://ci-cd-automatedrec.onrender.com/api/candidate/applications/$applicationId/draft"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
@@ -220,7 +220,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
 
       final res = await http.post(
         Uri.parse(
-            "http://127.0.0.1:5000/api/candidate/applications/$applicationId/draft"),
+            "https://ci-cd-automatedrec.onrender.com/api/candidate/applications/$applicationId/draft"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
@@ -256,7 +256,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
     try {
       final res = await http.post(
         Uri.parse(
-            "http://127.0.0.1:5000/api/candidate/apply/${widget.job["id"]}"),
+            "https://ci-cd-automatedrec.onrender.com/api/candidate/apply/${widget.job["id"]}"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
