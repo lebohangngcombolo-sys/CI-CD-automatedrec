@@ -26,6 +26,7 @@ oauth = OAuth()  # <-- Authlib OAuth
 cors = CORS()
 validator = PasswordValidator()   # ← IMPORTANT
 bcrypt = Bcrypt()
+socketio = SocketIO()
 
 # ------------------- Cloudinary Client -------------------
 class CloudinaryClient:

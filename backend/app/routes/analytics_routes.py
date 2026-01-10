@@ -306,4 +306,3 @@ def experience_distribution():
                 distribution[years] = distribution.get(years, 0) + 1
 
     return jsonify(distribution)
-

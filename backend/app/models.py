@@ -2,6 +2,8 @@ from app.extensions import db
 from datetime import datetime
 from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.mutable import MutableDict, MutableList
+import enum
 
 # ------------------- USER -------------------
 class User(db.Model):
@@ -12,29 +14,74 @@ class User(db.Model):
     password = db.Column(db.String(200), nullable=False)
     role = db.Column(db.String(50), default='candidate')
 
-    profile = db.Column(JSON, default={})
-    settings = db.Column(JSON, default=dict)
+    profile = db.Column(JSON, default=lambda: {})
+    settings = db.Column(JSON, default=lambda: {})
+
     is_verified = db.Column(db.Boolean, default=False)
     enrollment_completed = db.Column(db.Boolean, default=False)
     dark_mode = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     first_login = db.Column(db.Boolean, default=True)
-    
+
     # MFA Fields
     mfa_secret = db.Column(db.String(32), nullable=True)
     mfa_enabled = db.Column(db.Boolean, default=False)
     mfa_verified = db.Column(db.Boolean, default=False)
-    mfa_backup_codes = db.Column(db.JSON, nullable=True)  # 🆕 ADD THIS LINE
+    mfa_backup_codes = db.Column(db.JSON, nullable=True)
 
     # 🔗 Relationships
     candidates = db.relationship('Candidate', back_populates='user', lazy=True)
     notifications = db.relationship('Notification', back_populates='user', lazy=True)
     oauth_connections = db.relationship('OAuthConnection', back_populates='user', lazy=True)
-    managed_interviews = db.relationship('Interview', back_populates='hiring_manager', lazy=True)
+    presence = db.relationship('UserPresence', back_populates='user', uselist=False, lazy=True)
+
+    # ✅ FIXED: Interviews where user is the hiring manager
+    managed_interviews = db.relationship(
+        'Interview',
+        foreign_keys='Interview.hiring_manager_id',
+        back_populates='hiring_manager',
+        lazy=True
+    )
+
+    # ✅ REQUIRED: Interviews cancelled by this user
+    cancelled_interviews = db.relationship(
+        'Interview',
+        foreign_keys='Interview.cancelled_by',
+        back_populates='cancelled_by_user',
+        lazy=True
+    )
+    
+    job_activity_logs = db.relationship(
+        'JobActivityLog',
+        back_populates='user_relation',  # must match the name in JobActivityLog
+        lazy=True,
+        cascade='all, delete-orphan'
+    )
+    
+    @property
+    def full_name(self):
+        """
+        Returns a safe display name for UI and audit logs.
+        Priority:
+        1. profile['full_name']
+        2. profile['first_name'] + profile['last_name']
+        3. email
+        """
+        if self.profile:
+            full_name = self.profile.get("full_name")
+            if full_name:
+                return full_name.strip()
+
+            first = self.profile.get("first_name")
+            last = self.profile.get("last_name")
+            if first or last:
+                return f"{first or ''} {last or ''}".strip()
+
+        return self.email
+
 
     def to_dict(self):
-        """Return sanitized user data for API responses."""
         return {
             "id": self.id,
             "email": self.email,
@@ -47,9 +94,17 @@ class User(db.Model):
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat(),
             "first_login": self.first_login,
-            "mfa_enabled": self.mfa_enabled  # 🆕 Include MFA status
+            "mfa_enabled": self.mfa_enabled
         }
 
+    def to_dict_with_presence(self):
+        user_dict = self.to_dict()
+        user_dict['presence'] = self.get_presence() if hasattr(self, 'get_presence') else {
+            'status': 'offline',
+            'last_seen': None
+        }
+        return user_dict
+    
 
 class OAuthConnection(db.Model):
     __tablename__ = 'oauth_connections'
@@ -76,6 +131,44 @@ class OAuthConnection(db.Model):
         }
 
 
+# ------------------- JOB ACTIVITY LOG -------------------
+class JobActivityLog(db.Model):
+    """Audit trail for job/requisition activities"""
+    __tablename__ = 'job_activity_logs'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    job_id = db.Column(db.Integer, db.ForeignKey('requisitions.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    action = db.Column(db.String(50), nullable=False)  # 'CREATE', 'UPDATE', 'DELETE', 'VIEW', 'VIEW_DETAILED', 'RESTORE'
+    details = db.Column(JSON, default={})
+    ip_address = db.Column(db.String(45))
+    user_agent = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    
+    # Relationships
+    job = db.relationship('Requisition', backref=db.backref('activity_logs', lazy=True, cascade='all, delete-orphan'))
+    user_relation = db.relationship('User', foreign_keys=[user_id], back_populates='job_activity_logs')
+    
+    def to_dict(self):
+        """Serialize for API responses"""
+        user_name = None
+        if self.user_relation:
+            user_name = self.user_relation.full_name
+        
+        return {
+            'id': self.id,
+            'job_id': self.job_id,
+            'user_id': self.user_id,
+            'user_name': user_name,
+            'user_email': self.user_relation.email if self.user_relation else None,
+            'action': self.action,
+            'details': self.details,
+            'ip_address': self.ip_address,
+            'user_agent': self.user_agent,
+            'timestamp': self.timestamp.isoformat() if self.timestamp else None
+        }
+
+
 # ------------------- REQUISITION -------------------
 class Requisition(db.Model):
     __tablename__ = 'requisitions'
@@ -96,6 +189,11 @@ class Requisition(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     published_on = db.Column(db.DateTime, default=datetime.utcnow)
     vacancy = db.Column(db.Integer, default=1)
+    
+    # NEW FIELDS FOR ENHANCED CRUD
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     applications = db.relationship('Application', back_populates='requisition', lazy=True)
 
@@ -115,12 +213,40 @@ class Requisition(db.Model):
             "weightings": self.weightings,
             "assessment_pack": self.assessment_pack,
             "created_by": self.created_by,
-            "created_at": self.created_at.isoformat(),
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "published_on": self.published_on.isoformat(),
             "vacancy": self.vacancy,
+            "is_active": self.is_active,
+            "deleted_at": self.deleted_at.isoformat() if self.deleted_at else None,
         }
-
-
+    
+    def to_dict_with_stats(self):
+        """Return job data with application statistics"""
+        from . import Application
+        
+        base_dict = self.to_dict()
+        
+        # Get application statistics
+        applications = Application.query.filter_by(requisition_id=self.id).all()
+        total_applications = len(applications)
+        
+        # Status breakdown
+        status_counts = {}
+        for app in applications:
+            status_counts[app.status] = status_counts.get(app.status, 0) + 1
+        
+        base_dict.update({
+            "statistics": {
+                "total_applications": total_applications,
+                "applications_by_status": status_counts,
+                "created_at": self.created_at.isoformat() if self.created_at else None,
+                "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+                "days_active": (datetime.utcnow() - self.created_at).days if self.created_at else 0
+            }
+        })
+        
+        return base_dict
 
 # ------------------- CANDIDATE -------------------
 class Candidate(db.Model):
@@ -147,13 +273,14 @@ class Candidate(db.Model):
     profile_picture = db.Column(db.String(1024), nullable=True)
 
     # Structured sections
-    education = db.Column(JSON, default=[])
-    skills = db.Column(JSON, default=[])
-    work_experience = db.Column(JSON, default=[])
-    certifications = db.Column(JSON, default=[])
-    languages = db.Column(JSON, default=[])
-    documents = db.Column(JSON, default=[])
-    profile = db.Column(JSON, default={})
+    education = db.Column(MutableList.as_mutable(JSON), default=list)
+    skills = db.Column(MutableList.as_mutable(JSON), default=list)
+    work_experience = db.Column(MutableList.as_mutable(JSON), default=list)
+    certifications = db.Column(MutableList.as_mutable(JSON), default=list)
+    languages = db.Column(MutableList.as_mutable(JSON), default=list)
+    documents = db.Column(MutableList.as_mutable(JSON), default=list)
+    profile = db.Column(MutableDict.as_mutable(JSON), default=dict)
+    overall_interview_score = db.Column(db.Float, default=0.0)
 
     cv_score = db.Column(db.Integer, default=0)
     dark_mode = db.Column(db.Boolean, default=False)
@@ -200,6 +327,7 @@ class Candidate(db.Model):
             "dark_mode": self.dark_mode,
             "notifications_email": self.notifications_email,
             "notifications_push": self.notifications_push,
+            "overall_interview_score": self.overall_interview_score,  # Add this
         }
 
 # ------------------- APPLICATION -------------------
@@ -221,6 +349,9 @@ class Application(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_saved_screen = db.Column(db.String(50))
     saved_at = db.Column(db.DateTime)
+    last_interview_date = db.Column(db.DateTime, nullable=True)
+    interview_status = db.Column(db.String(50), default='not_scheduled')  # not_scheduled, scheduled, completed, no_show, cancelled
+    interview_feedback_score = db.Column(db.Float, default=0.0)
 
     candidate = db.relationship('Candidate', back_populates='applications')
     requisition = db.relationship('Requisition', back_populates='applications')
@@ -245,7 +376,10 @@ class Application(db.Model):
             "created_at": self.created_at.isoformat(),
             "assessment_results": [ar.to_dict() for ar in self.assessment_results],
             "last_saved_screen": self.last_saved_screen,
-            "saved_at": self.saved_at.isoformat() if self.saved_at else None
+            "saved_at": self.saved_at.isoformat() if self.saved_at else None,
+            "last_interview_date": self.last_interview_date.isoformat() if self.last_interview_date else None,
+            "interview_status": self.interview_status,
+            "interview_feedback_score": self.interview_feedback_score,
         }
 
 
@@ -290,15 +424,32 @@ class Interview(db.Model):
     scheduled_time = db.Column(db.DateTime, nullable=False)
     interview_type = db.Column(db.String(50), nullable=True)
     meeting_link = db.Column(db.String(255), nullable=True)
-    status = db.Column(db.String(50), default='scheduled')
+    status = db.Column(db.String(50), default='scheduled')  # Add this line if not present
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # Add this
+    
+    # Google Calendar Integration Fields
+    google_calendar_event_id = db.Column(db.String(255), nullable=True, index=True)
+    google_calendar_event_link = db.Column(db.String(500), nullable=True)
+    google_calendar_hangout_link = db.Column(db.String(500), nullable=True)
+    last_calendar_sync = db.Column(db.DateTime, nullable=True)
+    
+    # Add these new fields for lifecycle enhancements
+    feedback_submitted_at = db.Column(db.DateTime, nullable=True)
+    cancelled_reason = db.Column(db.Text, nullable=True)
+    cancelled_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    no_show_reason = db.Column(db.Text, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    
     candidate = db.relationship('Candidate', back_populates='interviews')
     application = db.relationship('Application', back_populates='interviews')
-    hiring_manager = db.relationship('User', back_populates='managed_interviews')
+    hiring_manager = db.relationship('User', foreign_keys=[hiring_manager_id], back_populates='managed_interviews')
+
+    cancelled_by_user = db.relationship('User', foreign_keys=[cancelled_by], back_populates='cancelled_interviews')
+
 
     def to_dict(self):
-        return {
+        result = {
             "id": self.id,
             "candidate_id": self.candidate_id,
             "hiring_manager_id": self.hiring_manager_id,
@@ -308,10 +459,24 @@ class Interview(db.Model):
             "meeting_link": self.meeting_link,
             "status": self.status,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "google_calendar_event_id": self.google_calendar_event_id,
+            "google_calendar_event_link": self.google_calendar_event_link,
+            "google_calendar_hangout_link": self.google_calendar_hangout_link,
+            "last_calendar_sync": self.last_calendar_sync.isoformat() if self.last_calendar_sync else None,
+            
+            # New fields
+            "feedback_submitted_at": self.feedback_submitted_at.isoformat() if self.feedback_submitted_at else None,
+            "cancelled_reason": self.cancelled_reason,
+            "cancelled_by": self.cancelled_by,
+            "no_show_reason": self.no_show_reason,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
+            
             "candidate": {
                 "id": self.candidate.id,
                 "full_name": self.candidate.full_name if hasattr(self.candidate, "full_name") else self.candidate.user.profile.get("full_name") if self.candidate.user else None,
-                "email": self.candidate.user.email if self.candidate.user else None
+                "email": self.candidate.user.email if self.candidate.user else None,
+                "profile_picture": self.candidate.profile_picture
             } if self.candidate else None,
             "hiring_manager": {
                 "id": self.hiring_manager.id,
@@ -319,8 +484,47 @@ class Interview(db.Model):
                 "email": self.hiring_manager.email
             } if self.hiring_manager else None,
         }
-
-
+        return result
+    
+    def update_calendar_info(self, calendar_data):
+        """Update interview with Google Calendar information"""
+        if calendar_data:
+            self.google_calendar_event_id = calendar_data.get('event_id')
+            self.google_calendar_event_link = calendar_data.get('html_link')
+            self.google_calendar_hangout_link = calendar_data.get('hangout_link')
+            self.last_calendar_sync = datetime.utcnow()
+            
+            # Update meeting link with Google Meet if not already set
+            if not self.meeting_link and calendar_data.get('conference_link'):
+                self.meeting_link = calendar_data.get('conference_link')
+    
+    def enrich_with_feedback_stats(self):
+        """Add feedback statistics to interview dict"""
+        from app.models import InterviewFeedback
+        
+        feedback_stats = {
+            "feedback_count": 0,
+            "average_rating": 0,
+            "recommendations": []
+        }
+        
+        feedbacks = InterviewFeedback.query.filter_by(
+            interview_id=self.id,
+            is_submitted=True
+        ).all()
+        
+        if feedbacks:
+            feedback_stats["feedback_count"] = len(feedbacks)
+            
+            # Calculate average rating
+            ratings = [fb.overall_rating for fb in feedbacks if fb.overall_rating]
+            if ratings:
+                feedback_stats["average_rating"] = sum(ratings) / len(ratings)
+            
+            # Get recommendations
+            feedback_stats["recommendations"] = [fb.recommendation for fb in feedbacks if fb.recommendation]
+        
+        return feedback_stats
 
 # ------------------- CV ANALYSIS -------------------
 class CVAnalysis(db.Model):
@@ -338,24 +542,38 @@ class CVAnalysis(db.Model):
 # ------------------- NOTIFICATION -------------------
 class Notification(db.Model):
     __tablename__ = 'notifications'
+
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+    # Core content
     message = db.Column(db.String(500), nullable=False)
+
+    # 🆕 Classification
+    type = db.Column(db.String(50), nullable=False, default="info")
+
+    # 🆕 Context linking
+    interview_id = db.Column(db.Integer, db.ForeignKey('interviews.id'), nullable=True)
+
+    # State
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # Relationships
     user = db.relationship('User', back_populates='notifications')
+    interview = db.relationship('Interview', backref='notifications')
 
     def to_dict(self):
         return {
             "id": self.id,
             "user_id": self.user_id,
             "message": self.message,
+            "type": self.type,
+            "interview_id": self.interview_id,
             "is_read": self.is_read,
             "created_at": self.created_at.isoformat()
         }
 
-    
 # ------------------- VERIFICATION CODE -------------------
 class VerificationCode(db.Model):
     __tablename__ = 'verification_codes'
@@ -498,4 +716,415 @@ class Meeting(db.Model):
             "cancelled": self.cancelled,
             "cancelled_at": self.cancelled_at.isoformat() if self.cancelled_at else None,
             "cancelled_by": self.cancelled_by
+        }
+
+# ------------------- CHAT FEATURE MODELS -------------------
+
+# Association table for chat participants
+chat_participants = db.Table(
+    'chat_participants',
+    db.Column('user_id', db.Integer, db.ForeignKey('users.id'), primary_key=True),
+    db.Column('chat_thread_id', db.Integer, db.ForeignKey('chat_threads.id'), primary_key=True),
+    db.Column('joined_at', db.DateTime, default=datetime.utcnow),
+    db.Column('is_admin', db.Boolean, default=False),
+    db.Column('muted_until', db.DateTime, nullable=True),
+
+    # Indexes
+    db.Index('idx_chat_user', 'user_id'),
+    db.Index('idx_chat_thread', 'chat_thread_id')
+)
+
+
+class ChatThread(db.Model):
+    __tablename__ = 'chat_threads'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    entity_type = db.Column(db.String(50), default='general')  # 'general', 'candidate', 'requisition'
+    entity_id = db.Column(db.String(100), nullable=True)  # ID of candidate/requisition
+    created_by = db.Column(db.Integer, db.ForeignKey('users.id'))
+    is_active = db.Column(db.Boolean, default=True)
+    is_archived = db.Column(db.Boolean, default=False)
+    last_message_at = db.Column(db.DateTime, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    participants = db.relationship('User', secondary=chat_participants, 
+                                 backref=db.backref('chat_threads', lazy='dynamic'))
+    messages = db.relationship('ChatMessage', backref='thread', lazy='dynamic',
+                             cascade='all, delete-orphan', order_by='desc(ChatMessage.created_at)')
+    
+    def to_dict(self):
+        """Return thread data for API responses."""
+        return {
+            'id': self.id,
+            'title': self.title,
+            'entity_type': self.entity_type,
+            'entity_id': self.entity_id,
+            'created_by': self.created_by,
+            'participant_count': len(self.participants) if self.participants else 0,
+            'last_message_at': self.last_message_at.isoformat() if self.last_message_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+            'is_active': self.is_active,
+            'is_archived': self.is_archived
+        }
+    
+    def to_dict_detailed(self):
+        """Return thread data with participants."""
+        thread_dict = self.to_dict()
+        
+        # Add participants information
+        if self.participants:
+            thread_dict['participants'] = [{
+                'user_id': user.id,
+                'name': user.profile.get('full_name') if user.profile else user.email,
+                'email': user.email,
+                'role': user.role,
+                'avatar_url': user.profile.get('profile_picture') if user.profile else None,
+            } for user in self.participants]
+        else:
+            thread_dict['participants'] = []
+        
+        return thread_dict
+
+
+class ChatMessage(db.Model):
+    __tablename__ = 'chat_messages'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    thread_id = db.Column(db.Integer, db.ForeignKey('chat_threads.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    message_type = db.Column(db.String(20), default='text')  # 'text', 'file', 'system'
+    message_metadata = db.Column(JSON, nullable=True)  # FIXED NAME
+    is_edited = db.Column(db.Boolean, default=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+    parent_message_id = db.Column(db.Integer, db.ForeignKey('chat_messages.id'), nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Self-referential for replies
+    parent = db.relationship('ChatMessage', remote_side=[id], backref='replies')
+    
+    def to_dict(self):
+        """Return message data for API responses."""
+        from . import User
+        sender = User.query.get(self.sender_id)
+        
+        sender_info = None
+        if sender:
+            sender_info = {
+                'user_id': sender.id,
+                'name': sender.profile.get('full_name') if sender.profile else sender.email,
+                'role': sender.role,
+                'avatar_url': sender.profile.get('profile_picture') if sender.profile else None
+            }
+        
+        return {
+            'id': self.id,
+            'thread_id': self.thread_id,
+            'sender': sender_info,
+            'content': '[Message deleted]' if self.is_deleted else self.content,
+            'message_type': self.message_type,
+            'metadata': self.message_metadata or {},  # UPDATED REFERENCE
+            'is_edited': self.is_edited,
+            'is_deleted': self.is_deleted,
+            'parent_message_id': self.parent_message_id,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+
+class MessageReadStatus(db.Model):
+    __tablename__ = 'message_read_status'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('chat_messages.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    read_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # Composite unique constraint
+    __table_args__ = (
+        db.UniqueConstraint('message_id', 'user_id', name='uq_message_user'),
+    )
+    
+    def to_dict(self):
+        return {
+            'message_id': self.message_id,
+            'user_id': self.user_id,
+            'read_at': self.read_at.isoformat() if self.read_at else None
+        }
+
+
+class UserPresence(db.Model):
+    __tablename__ = 'user_presence'
+    
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
+    status = db.Column(db.String(20), default='offline')  # 'online', 'away', 'offline'
+    last_seen = db.Column(db.DateTime, default=datetime.utcnow)
+    is_typing = db.Column(db.Boolean, default=False)
+    typing_in_thread = db.Column(db.Integer, nullable=True)
+    socket_id = db.Column(db.String(100), nullable=True)
+    
+    # Relationship
+    user = db.relationship('User', backref=db.backref('user_presence', uselist=False))
+
+    
+    def to_dict(self):
+        return {
+            'user_id': self.user_id,
+            'status': self.status,
+            'last_seen': self.last_seen.isoformat() if self.last_seen else None,
+            'is_typing': self.is_typing,
+            'typing_in_thread': self.typing_in_thread
+        }
+        
+class OfferStatus(enum.Enum):
+    DRAFT = "draft"
+    REVIEWED = "reviewed"
+    APPROVED = "approved"
+    SENT = "sent"
+    SIGNED = "signed"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+    WITHDRAWN = "withdrawn"
+
+
+
+class Offer(db.Model):
+    __tablename__ = "offers"
+
+    id = db.Column(db.Integer, primary_key=True)
+
+    # Core linkage
+    application_id = db.Column(
+        db.Integer,
+        db.ForeignKey("applications.id"),
+        nullable=False,
+        index=True
+    )
+
+    # Actors
+    drafted_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    hiring_manager_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    hr_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    approved_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    signed_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+
+    # Compensation
+    base_salary = db.Column(db.Numeric(12, 2), nullable=True)
+    allowances = db.Column(JSONB, default=dict, nullable=False)
+    bonuses = db.Column(JSONB, default=dict, nullable=False)
+
+    # Contract details
+    contract_type = db.Column(db.String(50))
+    start_date = db.Column(db.Date)
+    work_location = db.Column(db.String(255))
+
+    # Offer lifecycle
+    status = db.Column(
+        db.Enum(OfferStatus, name="offer_status"),
+        default=OfferStatus.DRAFT,
+        nullable=False,
+        index=True
+    )
+
+    # Document management
+    pdf_url = db.Column(db.String(500))
+    pdf_public_id = db.Column(db.String(255))
+    pdf_generated_at = db.Column(db.DateTime)
+
+    # Candidate acceptance metadata
+    signed_at = db.Column(db.DateTime)
+    candidate_ip = db.Column(db.String(45))
+    candidate_user_agent = db.Column(db.String(255))
+
+    # Notes & versioning
+    notes = db.Column(db.Text)
+    offer_version = db.Column(db.Integer, default=1, nullable=False)
+
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False
+    )
+
+    # Relationships
+    application = db.relationship("Application", backref=db.backref("offers", lazy="dynamic"))
+
+    drafted_by_user = db.relationship("User", foreign_keys=[drafted_by])
+    hiring_manager = db.relationship("User", foreign_keys=[hiring_manager_id])
+    hr_user = db.relationship("User", foreign_keys=[hr_id])
+    approved_by_user = db.relationship("User", foreign_keys=[approved_by])
+    signed_by_user = db.relationship("User", foreign_keys=[signed_by])
+
+    __table_args__ = (
+        db.UniqueConstraint("application_id", name="uq_offer_application"),
+    )
+
+    # ---------------- Serialization ----------------
+    def to_dict(self, include_users=False):
+        data = {
+            "id": self.id,
+            "application_id": self.application_id,
+            "base_salary": str(self.base_salary) if self.base_salary else None,
+            "allowances": self.allowances,
+            "bonuses": self.bonuses,
+            "contract_type": self.contract_type,
+            "start_date": self.start_date.isoformat() if self.start_date else None,
+            "work_location": self.work_location,
+            "status": self.status.value,
+            "pdf_url": self.pdf_url,
+            "notes": self.notes,
+            "offer_version": self.offer_version,
+            "signed_at": self.signed_at.isoformat() if self.signed_at else None,
+            "created_at": self.created_at.isoformat(),
+            "updated_at": self.updated_at.isoformat(),
+        }
+
+        if include_users:
+            data.update({
+                "drafted_by": self.drafted_by_user.to_dict() if self.drafted_by_user else None,
+                "hiring_manager": self.hiring_manager.to_dict() if self.hiring_manager else None,
+                "hr_user": self.hr_user.to_dict() if self.hr_user else None,
+                "approved_by": self.approved_by_user.to_dict() if self.approved_by_user else None,
+                "signed_by": self.signed_by_user.to_dict() if self.signed_by_user else None,
+            })
+
+        return data
+    
+# Add these after your existing models
+
+# =====================================================
+# 📝 INTERVIEW ENHANCEMENT MODELS
+# =====================================================
+
+class InterviewNote(db.Model):
+    """Interview notes and status change history"""
+    __tablename__ = 'interview_notes'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    interview_id = db.Column(db.Integer, db.ForeignKey('interviews.id'), nullable=False)
+    notes = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    interview = db.relationship('Interview', backref=db.backref('interview_notes', lazy=True, cascade='all, delete-orphan'))
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "interview_id": self.interview_id,
+            "notes": self.notes,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class InterviewFeedback(db.Model):
+    """Structured interview feedback"""
+    __tablename__ = 'interview_feedback'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    interview_id = db.Column(db.Integer, db.ForeignKey('interviews.id'), nullable=False)
+    interviewer_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    interviewer_name = db.Column(db.String(200))
+    interviewer_email = db.Column(db.String(200))
+    
+    # Ratings (1-5 scale)
+    overall_rating = db.Column(db.Integer, nullable=False)  # 1-5
+    technical_skills = db.Column(db.Integer)  # 1-5
+    communication = db.Column(db.Integer)  # 1-5
+    culture_fit = db.Column(db.Integer)  # 1-5
+    problem_solving = db.Column(db.Integer)  # 1-5
+    experience_relevance = db.Column(db.Integer)  # 1-5
+    average_rating = db.Column(db.Float)  # Calculated average
+    
+    # Recommendation
+    recommendation = db.Column(db.String(50), nullable=False)  # strong_hire, hire, no_hire, strong_no_hire, not_sure
+    
+    # Text feedback
+    strengths = db.Column(db.Text)
+    weaknesses = db.Column(db.Text)
+    additional_notes = db.Column(db.Text)
+    private_notes = db.Column(db.Text)  # Only visible to hiring team
+    
+    # Status
+    is_submitted = db.Column(db.Boolean, default=False)
+    submitted_at = db.Column(db.DateTime)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    interview = db.relationship('Interview', backref=db.backref('feedbacks', lazy=True, cascade='all, delete-orphan'))
+    interviewer = db.relationship('User', backref=db.backref('interview_feedbacks', lazy=True))
+    
+    __table_args__ = (
+        db.UniqueConstraint('interview_id', 'interviewer_id', name='unique_interviewer_feedback'),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "interview_id": self.interview_id,
+            "interviewer_id": self.interviewer_id,
+            "interviewer_name": self.interviewer_name,
+            "interviewer_email": self.interviewer_email,
+            "overall_rating": self.overall_rating,
+            "technical_skills": self.technical_skills,
+            "communication": self.communication,
+            "culture_fit": self.culture_fit,
+            "problem_solving": self.problem_solving,
+            "experience_relevance": self.experience_relevance,
+            "average_rating": self.average_rating,
+            "recommendation": self.recommendation,
+            "strengths": self.strengths,
+            "weaknesses": self.weaknesses,
+            "additional_notes": self.additional_notes,
+            "private_notes": self.private_notes,  # Only include in admin responses
+            "is_submitted": self.is_submitted,
+            "submitted_at": self.submitted_at.isoformat() if self.submitted_at else None,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class InterviewReminder(db.Model):
+    """Scheduled interview reminders"""
+    __tablename__ = 'interview_reminders'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    interview_id = db.Column(db.Integer, db.ForeignKey('interviews.id'), nullable=False)
+    reminder_type = db.Column(db.String(50), nullable=False)  # 24_hours_before, 1_hour_before, custom
+    scheduled_time = db.Column(db.DateTime, nullable=False)
+    sent_at = db.Column(db.DateTime)
+    status = db.Column(db.String(20), default='pending')  # pending, sent, failed, cancelled
+    error_message = db.Column(db.Text)
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    interview = db.relationship('Interview', backref=db.backref('reminders', lazy=True, cascade='all, delete-orphan'))
+    
+    __table_args__ = (
+        db.UniqueConstraint('interview_id', 'reminder_type', name='unique_reminder_type'),
+    )
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "interview_id": self.interview_id,
+            "reminder_type": self.reminder_type,
+            "scheduled_time": self.scheduled_time.isoformat() if self.scheduled_time else None,
+            "sent_at": self.sent_at.isoformat() if self.sent_at else None,
+            "status": self.status,
+            "error_message": self.error_message,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }

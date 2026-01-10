@@ -4,7 +4,14 @@ import json
 import logging
 import time
 from typing import Dict, Any, Optional
+from dotenv import load_dotenv
 
+
+# ----------------------------
+# Environment & Logging Setup
+# ----------------------------
+load_dotenv()
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")

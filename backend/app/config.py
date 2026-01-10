@@ -64,6 +64,16 @@ class Config:
     # SSO Configuration for Company Hub Integration
     SSO_JWT_SECRET = os.getenv('SSO_JWT_SECRET', 'our-super-secret-code-123')  # Same as hub!
     PORTAL_HUB_URL = os.getenv('PORTAL_HUB_URL', 'http://localhost:5001')  # Hub address
+    
+    VALID_ROLES = ["admin", "hiring_manager", "candidate", "hr"]
+    
+    # Google Calendar Integration (NEW)
+    GOOGLE_CALENDAR_ENABLED = os.getenv('GOOGLE_CALENDAR_ENABLED', 'False').lower() == 'true'
+    GOOGLE_CALENDAR_CREDENTIALS_PATH = os.getenv('GOOGLE_CALENDAR_CREDENTIALS_PATH', 'credentials.json')
+    GOOGLE_CALENDAR_TOKEN_PATH = os.getenv('GOOGLE_CALENDAR_TOKEN_PATH', 'token.pickle')
+    GOOGLE_CALENDAR_DEFAULT_DURATION = int(os.getenv('GOOGLE_CALENDAR_DEFAULT_DURATION', '60'))  # minutes
+    GOOGLE_CALENDAR_TIMEZONE = os.getenv('GOOGLE_CALENDAR_TIMEZONE', 'UTC')
+
 
 
 class DevelopmentConfig(Config):
