@@ -44,7 +44,7 @@ def create_app(config_name=None):
     socketio.init_app(
         app,
         cors_allowed_origins="*",
-        async_mode='eventlet',  # or 'gevent' depending on your setup
+        async_mode="threading",  # or 'gevent' depending on your setup
         manage_session=False,
         ping_timeout=60,
         ping_interval=25
