@@ -151,13 +151,11 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen>
                           inputType: TextInputType.emailAddress,
                           textColor: Colors.white,
                           backgroundColor: Colors.transparent,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: BorderSide(
-                              color: Colors.white.withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
+                          borderColor: Colors.white.withOpacity(0.3),
+                          focusedBorderColor: Colors.white,
+                          borderRadius: 15,
+                          borderWidth: 1,
+                          focusedBorderWidth: 1.5,
                         ),
                         const SizedBox(height: 24),
                         // Medium Rounded Button

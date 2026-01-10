@@ -14,8 +14,7 @@ import '../../widgets/custom_textfield.dart';
 import '../../services/auth_service.dart';
 
 // ------------------- API Base URL -------------------
-const String candidateBase =
-    "https://ci-cd-automatedrec.onrender.com/api/candidate";
+const String candidateBase = "http://127.0.0.1:5000/api/candidate";
 
 class ProfilePage extends StatefulWidget {
   final String token;
@@ -29,8 +28,13 @@ class _ProfilePageState extends State<ProfilePage>
     with TickerProviderStateMixin {
   bool loading = true;
   bool showProfileSummary = true;
-
   String selectedSidebar = "Profile";
+  String? _selectedGender;
+  String? _selectedNationality;
+  String? _selectedTitle;
+  DateTime? _selectedDate;
+  List<TextEditingController> _workExpControllers = [TextEditingController()];
+  List<TextEditingController> _educationControllers = [TextEditingController()];
 
   // Profile Controllers
   final TextEditingController fullNameController = TextEditingController();
@@ -82,9 +86,76 @@ class _ProfilePageState extends State<ProfilePage>
   int _backupCodesRemaining = 0;
 
   List<dynamic> documents = [];
+  final String apiBase = "http://127.0.0.1:5000/api/candidate";
 
-  final String apiBase =
-      "https://ci-cd-automatedrec.onrender.com/api/candidate";
+  // Add these helper methods in the _ProfilePageState class (around line 150, after the state variables):
+
+  // Helper methods for dropdown options
+  List<Map<String, String>> get genderOptions => [
+        {'value': '', 'label': 'Select Gender'},
+        {'value': 'male', 'label': 'Male'},
+        {'value': 'female', 'label': 'Female'},
+        {'value': 'other', 'label': 'Other'},
+        {'value': 'prefer_not_to_say', 'label': 'Prefer not to say'}
+      ];
+
+  List<Map<String, String>> get nationalityOptions => [
+        {'value': '', 'label': 'Select Nationality'},
+        {'value': 'kenyan', 'label': 'Kenyan'},
+        {'value': 'tanzanian', 'label': 'Tanzanian'},
+        {'value': 'ugandan', 'label': 'Ugandan'},
+        {'value': 'rwandan', 'label': 'Rwandan'},
+        {'value': 'burundian', 'label': 'Burundian'},
+        {'value': 'south_sudanese', 'label': 'South Sudanese'},
+        {'value': 'other', 'label': 'Other'}
+      ];
+
+  List<Map<String, String>> get titleOptions => [
+        {'value': '', 'label': 'Select Title'},
+        {'value': 'mr', 'label': 'Mr.'},
+        {'value': 'mrs', 'label': 'Mrs.'},
+        {'value': 'ms', 'label': 'Ms.'},
+        {'value': 'miss', 'label': 'Miss'},
+        {'value': 'dr', 'label': 'Dr.'},
+        {'value': 'prof', 'label': 'Prof.'},
+        {'value': 'eng', 'label': 'Eng.'},
+        {'value': 'other', 'label': 'Other'}
+      ];
+
+  // Helper method to get value from stored data
+  String? _getValueFromStoredData(
+      String? storedValue, List<Map<String, String>> options) {
+    if (storedValue == null || storedValue.isEmpty) return '';
+
+    // Convert stored value to lowercase for comparison
+    String lowerValue = storedValue.toLowerCase();
+
+    // Try to find exact match first
+    for (var option in options) {
+      if (option['label']?.toLowerCase() == lowerValue ||
+          option['value'] == lowerValue) {
+        return option['value'];
+      }
+    }
+
+    // If no exact match, try partial match
+    for (var option in options) {
+      if (option['label']?.toLowerCase().contains(lowerValue) == true ||
+          lowerValue.contains(option['value']!)) {
+        return option['value'];
+      }
+    }
+
+    return '';
+  }
+
+  // Helper method to get label from value
+  String _getLabelFromValue(String? value, List<Map<String, String>> options) {
+    if (value == null || value.isEmpty) return '';
+    final option = options.firstWhere((opt) => opt['value'] == value,
+        orElse: () => {'label': '', 'value': ''});
+    return option['label'] ?? '';
+  }
 
   @override
   void initState() {
@@ -93,7 +164,7 @@ class _ProfilePageState extends State<ProfilePage>
     _loadMfaStatus();
   }
 
-  // 🆕 MFA METHODS
+  // 🆕 MFA METHODS (unchanged)
   Future<void> _loadMfaStatus() async {
     try {
       final result = await AuthService.getMfaStatus();
@@ -138,7 +209,7 @@ class _ProfilePageState extends State<ProfilePage>
           _backupCodes = List<String>.from(result['backup_codes']);
           _backupCodesRemaining = _backupCodes.length;
         });
-        Navigator.pop(context); // Close setup dialog
+        Navigator.pop(context);
         _showBackupCodesDialog();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("MFA enabled successfully")),
@@ -226,13 +297,21 @@ class _ProfilePageState extends State<ProfilePage>
       barrierDismissible: false,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: const Text("Setup Two-Factor Authentication"),
+          backgroundColor: Colors.white,
+          title: Text(
+            "Setup Two-Factor Authentication",
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.w600,
+              color: Colors.black,
+            ),
+          ),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   "Scan the QR code with your authenticator app:",
+                  style: GoogleFonts.inter(color: Colors.black87),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 16),
@@ -246,38 +325,57 @@ class _ProfilePageState extends State<ProfilePage>
                     child: Image.network(_mfaQrCode!, height: 200, width: 200),
                   ),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                   "Or enter this secret manually:",
+                  style: GoogleFonts.inter(color: Colors.black87),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
+                    color: Colors.grey.shade50,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: SelectableText(
                     _mfaSecret ?? '',
-                    style:
-                        const TextStyle(fontFamily: 'Monospace', fontSize: 14),
+                    style: GoogleFonts.robotoMono(
+                      fontSize: 14,
+                      color: Colors.black,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text("Enter the 6-digit code from your app:"),
+                Text(
+                  "Enter the 6-digit code from your app:",
+                  style: GoogleFonts.inter(color: Colors.black87),
+                ),
                 const SizedBox(height: 8),
                 TextField(
                   controller: tokenController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Verification Code',
-                    border: OutlineInputBorder(),
+                    labelStyle: GoogleFonts.inter(color: Colors.black54),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: Colors.redAccent),
+                    ),
                     hintText: '123456',
+                    hintStyle: GoogleFonts.inter(color: Colors.grey),
                   ),
                   keyboardType: TextInputType.number,
                   maxLength: 6,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 18, letterSpacing: 4),
+                  style: GoogleFonts.robotoMono(
+                    fontSize: 18,
+                    letterSpacing: 4,
+                    color: Colors.black,
+                  ),
                 ),
               ],
             ),
@@ -285,7 +383,10 @@ class _ProfilePageState extends State<ProfilePage>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
+              child: Text(
+                "Cancel",
+                style: GoogleFonts.inter(color: Colors.black54),
+              ),
             ),
             ElevatedButton(
               onPressed: _mfaLoading
@@ -300,13 +401,25 @@ class _ProfilePageState extends State<ProfilePage>
                         );
                       }
                     },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
               child: _mfaLoading
                   ? const SizedBox(
                       height: 16,
                       width: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
                     )
-                  : const Text("Verify & Enable"),
+                  : Text(
+                      "Verify & Enable",
+                      style: GoogleFonts.inter(color: Colors.white),
+                    ),
             ),
           ],
         ),
@@ -319,20 +432,30 @@ class _ProfilePageState extends State<ProfilePage>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Row(
+        backgroundColor: Colors.white,
+        title: Row(
           children: [
-            Icon(Icons.security, color: Colors.orange),
-            SizedBox(width: 8),
-            Text("Backup Codes"),
+            Icon(Icons.security, color: Colors.redAccent),
+            const SizedBox(width: 8),
+            Text(
+              "Backup Codes",
+              style: GoogleFonts.poppins(
+                fontWeight: FontWeight.w600,
+                color: Colors.black,
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 "Save these backup codes in a secure place. Each code can be used once if you lose access to your authenticator app.",
-                style: TextStyle(fontSize: 14, color: Colors.grey),
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  color: Colors.black54,
+                ),
               ),
               const SizedBox(height: 16),
               Container(
@@ -348,16 +471,20 @@ class _ProfilePageState extends State<ProfilePage>
                             padding: const EdgeInsets.symmetric(vertical: 6),
                             child: Row(
                               children: [
-                                Icon(Icons.vpn_key,
-                                    color: Colors.grey.shade600, size: 16),
+                                Icon(
+                                  Icons.vpn_key,
+                                  color: Colors.redAccent,
+                                  size: 16,
+                                ),
                                 const SizedBox(width: 8),
                                 Expanded(
                                   child: SelectableText(
                                     code,
-                                    style: const TextStyle(
-                                        fontFamily: 'Monospace',
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w500),
+                                    style: GoogleFonts.robotoMono(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.black,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -367,17 +494,29 @@ class _ProfilePageState extends State<ProfilePage>
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 "⚠️ These codes won't be shown again. Make sure to save them now!",
-                style: TextStyle(fontSize: 12, color: Colors.red),
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: Colors.redAccent,
+                ),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("I've Saved These Codes"),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: Text(
+              "I've Saved These Codes",
+              style: GoogleFonts.inter(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -390,26 +529,48 @@ class _ProfilePageState extends State<ProfilePage>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Disable Two-Factor Authentication"),
+        backgroundColor: Colors.white,
+        title: Text(
+          "Disable Two-Factor Authentication",
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.w600,
+            color: Colors.black,
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("Enter your password to disable 2FA:"),
+            Text(
+              "Enter your password to disable 2FA:",
+              style: GoogleFonts.inter(color: Colors.black87),
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: passwordController,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Password',
-                border: OutlineInputBorder(),
+                labelStyle: GoogleFonts.inter(color: Colors.black54),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide(color: Colors.grey.shade300),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: Colors.redAccent),
+                ),
               ),
               obscureText: true,
+              style: GoogleFonts.inter(color: Colors.black),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
+            child: Text(
+              "Cancel",
+              style: GoogleFonts.inter(color: Colors.black54),
+            ),
           ),
           ElevatedButton(
             onPressed: _mfaLoading
@@ -426,22 +587,31 @@ class _ProfilePageState extends State<ProfilePage>
                     }
                   },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: _mfaLoading
                 ? const SizedBox(
                     height: 16,
                     width: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
                   )
-                : const Text("Disable 2FA"),
+                : Text(
+                    "Disable 2FA",
+                    style: GoogleFonts.inter(color: Colors.white),
+                  ),
           ),
         ],
       ),
     );
   }
 
-  // EXISTING PROFILE METHODS
+  // EXISTING PROFILE METHODS (unchanged)
   Future<void> fetchProfileAndSettings() async {
     try {
       final profileRes = await http.get(
@@ -460,28 +630,70 @@ class _ProfilePageState extends State<ProfilePage>
         fullNameController.text = candidate['full_name'] ?? "";
         emailController.text = user['profile']['email'] ?? "";
         phoneController.text = candidate['phone'] ?? "";
-        genderController.text = candidate['gender'] ?? "";
-        dobController.text = candidate['dob'] ?? "";
-        nationalityController.text = candidate['nationality'] ?? "";
+
+        // Initialize dropdown values using helper methods
+        final storedGender = candidate['gender'] ?? "";
+        _selectedGender = _getValueFromStoredData(storedGender, genderOptions);
+        genderController.text =
+            _getLabelFromValue(_selectedGender, genderOptions);
+
+        final storedNationality = candidate['nationality'] ?? "";
+        _selectedNationality =
+            _getValueFromStoredData(storedNationality, nationalityOptions);
+        nationalityController.text =
+            _getLabelFromValue(_selectedNationality, nationalityOptions);
+
+        final storedTitle = candidate['title'] ?? "";
+        _selectedTitle = _getValueFromStoredData(storedTitle, titleOptions);
+        titleController.text = _getLabelFromValue(_selectedTitle, titleOptions);
+
+        // Initialize date
+        if (candidate['dob'] != null && candidate['dob'].isNotEmpty) {
+          _selectedDate = DateTime.tryParse(candidate['dob']);
+          dobController.text = candidate['dob'] ?? "";
+        }
+
         idNumberController.text = candidate['id_number'] ?? "";
         bioController.text = candidate['bio'] ?? "";
         locationController.text = candidate['location'] ?? "";
-        titleController.text = candidate['title'] ?? "";
 
-        degreeController.text = candidate['degree'] ?? "";
-        institutionController.text = candidate['institution'] ?? "";
-        graduationYearController.text = candidate['graduation_year'] ?? "";
+        // Initialize education and work experience
+        final degree = candidate['degree'] ?? "";
+        final institution = candidate['institution'] ?? "";
+        final graduationYear = candidate['graduation_year'] ?? "";
+
+        if (degree.isNotEmpty || institution.isNotEmpty) {
+          _educationControllers.clear();
+          _educationControllers.add(TextEditingController(
+              text:
+                  "$degree${institution.isNotEmpty ? ' at $institution' : ''}${graduationYear.isNotEmpty ? ' ($graduationYear)' : ''}"));
+        } else {
+          _educationControllers = [TextEditingController()];
+        }
+
+        final workExperience = candidate['work_experience'] ?? [];
+        if (workExperience.isNotEmpty && workExperience is List) {
+          _workExpControllers.clear();
+          for (var exp in workExperience) {
+            _workExpControllers
+                .add(TextEditingController(text: exp.toString()));
+          }
+        } else {
+          _workExpControllers = [TextEditingController()];
+        }
+
+        // Initialize the workExpController with first entry for backward compatibility
+        if (_workExpControllers.isNotEmpty) {
+          workExpController.text = _workExpControllers.first.text;
+        }
+
         skillsController.text = (candidate['skills'] ?? []).join(", ");
-        workExpController.text =
-            (candidate['work_experience'] ?? []).join("\n");
         jobTitleController.text = candidate['job_title'] ?? "";
         companyController.text = candidate['company'] ?? "";
         yearsOfExpController.text = candidate['years_of_experience'] ?? "";
         linkedinController.text = candidate['linkedin'] ?? "";
         githubController.text = candidate['github'] ?? "";
         portfolioController.text = candidate['portfolio'] ?? "";
-        cvTextController.text = candidate['cv_text'] ?? "";
-        cvUrlController.text = candidate['cv_url'] ?? "";
         documents = candidate['documents'] ?? [];
         _profileImageUrl = candidate['profile_picture'] ?? "";
       }
@@ -559,34 +771,58 @@ class _ProfilePageState extends State<ProfilePage>
 
   Future<void> updateProfile() async {
     try {
+      // Collect all work experience entries
+      final workExpEntries = _workExpControllers
+          .map((controller) => controller.text.trim())
+          .where((text) => text.isNotEmpty)
+          .toList();
+
+      // Collect all education entries
+      final educationEntries = _educationControllers
+          .map((controller) => controller.text.trim())
+          .where((text) => text.isNotEmpty)
+          .toList();
+
+      // For backward compatibility, set the first work experience to the original controller
+      if (workExpEntries.isNotEmpty) {
+        workExpController.text = workExpEntries.first;
+      }
+
+      // For backward compatibility, set the first education to the original controllers
+      if (educationEntries.isNotEmpty) {
+        // You might want to parse the education string back into degree, institution, year
+        // For now, we'll just use the first entry
+        final firstEducation = educationEntries.first;
+        degreeController.text = firstEducation;
+        institutionController.text = "";
+        graduationYearController.text = "";
+      }
+
       final payload = {
         "full_name": fullNameController.text,
         "phone": phoneController.text,
-        "gender": genderController.text,
-        "dob": dobController.text.isNotEmpty
-            ? DateFormat('yyyy-MM-dd')
-                .format(DateTime.parse(dobController.text))
+        "gender": _getLabelFromValue(_selectedGender, genderOptions),
+        "dob": _selectedDate != null
+            ? DateFormat('yyyy-MM-dd').format(_selectedDate!)
             : null,
-        "nationality": nationalityController.text,
+        "nationality":
+            _getLabelFromValue(_selectedNationality, nationalityOptions),
         "id_number": idNumberController.text,
         "bio": bioController.text,
         "location": locationController.text,
-        "title": titleController.text,
+        "title": _getLabelFromValue(_selectedTitle, titleOptions),
         "degree": degreeController.text,
         "institution": institutionController.text,
         "graduation_year": graduationYearController.text,
         "skills":
             skillsController.text.split(",").map((e) => e.trim()).toList(),
-        "work_experience":
-            workExpController.text.split("\n").map((e) => e.trim()).toList(),
+        "work_experience": workExpEntries,
         "job_title": jobTitleController.text,
         "company": companyController.text,
         "years_of_experience": yearsOfExpController.text,
         "linkedin": linkedinController.text,
         "github": githubController.text,
         "portfolio": portfolioController.text,
-        "cv_text": cvTextController.text,
-        "cv_url": cvUrlController.text,
         "user_profile": {"email": emailController.text},
       };
 
@@ -646,47 +882,42 @@ class _ProfilePageState extends State<ProfilePage>
     return const AssetImage("assets/images/profile_placeholder.png");
   }
 
-  Widget _modernCard(String title, Widget child, {Color? headerColor}) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
+  Widget _modernCard(String title, Widget child) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      margin: const EdgeInsets.only(bottom: 20),
       decoration: BoxDecoration(
-        color:
-            themeProvider.isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
+        border: Border.all(color: Colors.grey.shade100, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: double.infinity,
+          Padding(
             padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: headerColor ?? Colors.redAccent.withOpacity(0.1),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
-            ),
-            child: Text(
-              title,
-              style: GoogleFonts.poppins(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: themeProvider.isDarkMode
-                    ? Colors.white
-                    : Colors.grey.shade800,
-              ),
+            child: Row(
+              children: [
+                Icon(Icons.circle, color: Colors.redAccent, size: 8),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: GoogleFonts.poppins(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black,
+                  ),
+                ),
+              ],
             ),
           ),
+          Divider(height: 0, color: Colors.grey.shade100),
           Padding(
             padding: const EdgeInsets.all(20),
             child: child,
@@ -702,167 +933,212 @@ class _ProfilePageState extends State<ProfilePage>
 
     if (loading) {
       return Scaffold(
-        backgroundColor: themeProvider.isDarkMode
-            ? const Color(0xFF14131E)
-            : Colors.grey.shade50,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.redAccent),
+        backgroundColor: Colors.transparent,
+        body: Stack(
+          children: [
+            // Full-background image
+            Positioned.fill(
+              child: Image.asset(
+                "assets/images/background.jpg",
+                fit: BoxFit.cover,
               ),
-              const SizedBox(height: 16),
-              Text(
-                "Loading Profile...",
-                style: GoogleFonts.inter(
-                  fontSize: 16,
-                  color: themeProvider.isDarkMode
-                      ? Colors.grey.shade400
-                      : Colors.grey.shade600,
-                ),
+            ),
+
+            // Loading indicator
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.redAccent),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    "Loading Profile...",
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      color: Colors.white.withOpacity(0.9),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
 
     return Theme(
-      data: themeProvider.themeData,
+      data: ThemeData(
+        brightness: Brightness.light,
+        primaryColor: Colors.redAccent,
+        scaffoldBackgroundColor: Colors.transparent,
+        cardColor: Colors.transparent,
+      ),
       child: Scaffold(
-        backgroundColor: themeProvider.isDarkMode
-            ? const Color(0xFF14131E)
-            : Colors.grey.shade50,
-        body: Row(
+        backgroundColor: Colors.transparent,
+        body: Stack(
           children: [
-            // Enhanced Sidebar
-            Container(
-              width: 280,
-              decoration: BoxDecoration(
-                color: themeProvider.isDarkMode
-                    ? const Color(0xFF14131E)
-                    : Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(2, 0),
-                  ),
-                ],
+            // Crystal-clear background image
+            Positioned.fill(
+              child: Image.asset(
+                "assets/images/dark.png",
+                fit: BoxFit.cover,
               ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  // Profile Summary in Sidebar
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      children: [
-                        GestureDetector(
-                          onTap: _pickProfileImage,
-                          child: Stack(
+            ),
+
+            // Foreground content
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Transparent Sidebar
+                Container(
+                  width: 280,
+                  height: double.infinity,
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.05), // almost invisible
+                    border: Border(
+                        right:
+                            BorderSide(color: Colors.white.withOpacity(0.1))),
+                  ),
+                  child: Column(
+                    children: [
+                      // Profile Section (transparent background)
+                      Column(
+                        children: [
+                          Stack(
                             children: [
-                              CircleAvatar(
-                                radius: 40,
-                                backgroundImage: _getProfileImageProvider(),
+                              Container(
+                                width: 100,
+                                height: 100,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.3),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(50),
+                                  child: Image(
+                                    image: _getProfileImageProvider(),
+                                    fit: BoxFit.cover,
+                                    errorBuilder:
+                                        (context, error, stackTrace) =>
+                                            Container(
+                                      color: Colors.white.withOpacity(0.1),
+                                      child: Icon(
+                                        Icons.person,
+                                        color: Colors.white.withOpacity(0.3),
+                                        size: 40,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                               ),
                               Positioned(
                                 bottom: 0,
                                 right: 0,
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.redAccent,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 2,
+                                child: GestureDetector(
+                                  onTap: _pickProfileImage,
+                                  child: Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: Colors.redAccent.withOpacity(0.8),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 2,
+                                      ),
                                     ),
-                                  ),
-                                  child: const Icon(
-                                    Icons.camera_alt,
-                                    color: Colors.white,
-                                    size: 16,
+                                    child: const Icon(
+                                      Icons.edit,
+                                      color: Colors.white,
+                                      size: 14,
+                                    ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          fullNameController.text.isNotEmpty
-                              ? fullNameController.text
-                              : "Your Name",
-                          style: GoogleFonts.poppins(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                            color: themeProvider.isDarkMode
-                                ? Colors.white
-                                : Colors.grey.shade900,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        Text(
-                          titleController.text.isNotEmpty
-                              ? titleController.text
-                              : "Your Title",
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            color: themeProvider.isDarkMode
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                        // 🆕 MFA Status in Sidebar
-                        if (_mfaEnabled) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.green),
+                          const SizedBox(height: 16),
+                          Text(
+                            fullNameController.text.isNotEmpty
+                                ? fullNameController.text
+                                : "Your Name",
+                            style: GoogleFonts.poppins(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.verified,
-                                    color: Colors.green, size: 12),
-                                const SizedBox(width: 4),
-                                Text(
-                                  "2FA Enabled",
-                                  style: GoogleFonts.inter(
-                                    fontSize: 10,
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.w600,
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            titleController.text.isNotEmpty
+                                ? titleController.text
+                                : "Your Title",
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: Colors.white70,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (_mfaEnabled) ...[
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.verified,
+                                      color: Colors.greenAccent, size: 12),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    "2FA Enabled",
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: Colors.greenAccent,
+                                      fontWeight: FontWeight.w500,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
+                          ],
                         ],
-                      ],
+                      ),
+                      const SizedBox(height: 40),
+                      // Navigation buttons
+                      _sidebarButton("Profile", Icons.person_outline_rounded),
+                      _sidebarButton("Settings", Icons.settings_outlined),
+                      _sidebarButton("2FA", Icons.security_outlined),
+                      _sidebarButton(
+                          "Reset Password", Icons.lock_reset_rounded),
+                    ],
+                  ),
+                ),
+
+                // Main Content Area (transparent)
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(30),
+                    color: Colors.transparent, // fully see-through
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 300),
+                      child: _buildSelectedTab(),
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  _sidebarButton("Profile", Icons.person_outline),
-                  _sidebarButton("Settings", Icons.settings_outlined),
-                  _sidebarButton("2FA", Icons.security_outlined),
-                  _sidebarButton("Reset Password", Icons.lock_reset_outlined),
-                ],
-              ),
-            ),
-
-            // Main Content
-            Expanded(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                child: _buildSelectedTab(),
-              ),
+                ),
+              ],
             ),
           ],
         ),
@@ -871,13 +1147,13 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _sidebarButton(String title, IconData icon) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
     final isSelected = selectedSidebar == title;
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      margin: const EdgeInsets.only(bottom: 8),
       child: Material(
-        color:
-            isSelected ? Colors.redAccent.withOpacity(0.1) : Colors.transparent,
+        color: isSelected
+            ? Colors.redAccent.withOpacity(0.2)
+            : Colors.white.withOpacity(0.05), // subtle transparent bg
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: () {
@@ -889,15 +1165,19 @@ class _ProfilePageState extends State<ProfilePage>
           borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              border: isSelected
+                  ? Border.all(color: Colors.redAccent.withOpacity(0.3))
+                  : null,
+              borderRadius: BorderRadius.circular(12),
+            ),
             child: Row(
               children: [
                 Icon(
                   icon,
                   color: isSelected
                       ? Colors.redAccent
-                      : (themeProvider.isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600),
+                      : Colors.white, // white for crystal-clear bg
                   size: 20,
                 ),
                 const SizedBox(width: 12),
@@ -905,12 +1185,10 @@ class _ProfilePageState extends State<ProfilePage>
                   title,
                   style: GoogleFonts.inter(
                     fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                     color: isSelected
                         ? Colors.redAccent
-                        : (themeProvider.isDarkMode
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade700),
+                        : Colors.white, // white for normal
                   ),
                 ),
                 const Spacer(),
@@ -948,15 +1226,13 @@ class _ProfilePageState extends State<ProfilePage>
     }
   }
 
-  // 🆕 ENHANCED 2FA TAB
+  // ENHANCED 2FA TAB
   Widget _build2FATab() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header
           Row(
             children: [
               IconButton(
@@ -964,9 +1240,7 @@ class _ProfilePageState extends State<ProfilePage>
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: themeProvider.isDarkMode
-                        ? const Color(0xFF14131E)
-                        : Colors.white,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
@@ -975,7 +1249,7 @@ class _ProfilePageState extends State<ProfilePage>
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.arrow_back, color: Colors.redAccent),
+                  child: Icon(Icons.arrow_back, color: Colors.redAccent),
                 ),
               ),
               const SizedBox(width: 12),
@@ -983,15 +1257,21 @@ class _ProfilePageState extends State<ProfilePage>
                 "Two-Factor Authentication",
                 style: GoogleFonts.poppins(
                   fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: themeProvider.isDarkMode
-                      ? Colors.white
-                      : Colors.grey.shade900,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 10),
+          Text(
+            "Add an extra layer of security to your account",
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 30),
 
           // Security Status Card
           _modernCard(
@@ -1015,7 +1295,7 @@ class _ProfilePageState extends State<ProfilePage>
                         size: 32,
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: 20),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1025,20 +1305,17 @@ class _ProfilePageState extends State<ProfilePage>
                             style: GoogleFonts.inter(
                               fontSize: 20,
                               fontWeight: FontWeight.w600,
-                              color: themeProvider.isDarkMode
-                                  ? Colors.white
-                                  : Colors.grey.shade800,
+                              color: Colors.black,
                             ),
                           ),
+                          const SizedBox(height: 4),
                           Text(
                             _mfaEnabled
                                 ? "Your account is protected with two-factor authentication"
                                 : "Add an extra layer of security to your account",
                             style: GoogleFonts.inter(
                               fontSize: 14,
-                              color: themeProvider.isDarkMode
-                                  ? Colors.grey.shade400
-                                  : Colors.grey.shade600,
+                              color: Colors.black54,
                             ),
                           ),
                           if (_mfaEnabled) ...[
@@ -1046,7 +1323,7 @@ class _ProfilePageState extends State<ProfilePage>
                             Text(
                               "$_backupCodesRemaining backup codes remaining",
                               style: GoogleFonts.inter(
-                                fontSize: 12,
+                                fontSize: 13,
                                 color: Colors.green,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -1057,15 +1334,13 @@ class _ProfilePageState extends State<ProfilePage>
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 24),
                 if (!_mfaEnabled) ...[
                   Text(
                     "Two-factor authentication adds an additional layer of security to your account by requiring more than just a password to sign in.",
                     style: GoogleFonts.inter(
                       fontSize: 14,
-                      color: themeProvider.isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
+                      color: Colors.black54,
                     ),
                   ),
                   const SizedBox(height: 24),
@@ -1080,6 +1355,7 @@ class _ProfilePageState extends State<ProfilePage>
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
+                        elevation: 0,
                       ),
                       child: _mfaLoading
                           ? const SizedBox(
@@ -1091,12 +1367,18 @@ class _ProfilePageState extends State<ProfilePage>
                                     AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
-                          : const Row(
+                          : Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.security),
-                                SizedBox(width: 8),
-                                Text("Enable 2FA"),
+                                Icon(Icons.security, size: 20),
+                                const SizedBox(width: 8),
+                                Text(
+                                  "Enable 2FA",
+                                  style: GoogleFonts.inter(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ],
                             ),
                     ),
@@ -1120,21 +1402,40 @@ class _ProfilePageState extends State<ProfilePage>
                           showDialog(
                             context: context,
                             builder: (context) => AlertDialog(
-                              title: const Text("Regenerate Backup Codes"),
-                              content: const Text(
+                              backgroundColor: Colors.white,
+                              title: Text(
+                                "Regenerate Backup Codes",
+                                style: GoogleFonts.poppins(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              content: Text(
                                 "This will invalidate all your existing backup codes. Are you sure?",
+                                style: GoogleFonts.inter(color: Colors.black54),
                               ),
                               actions: [
                                 TextButton(
                                   onPressed: () => Navigator.pop(context),
-                                  child: const Text("Cancel"),
+                                  child: Text(
+                                    "Cancel",
+                                    style: GoogleFonts.inter(
+                                        color: Colors.black54),
+                                  ),
                                 ),
                                 ElevatedButton(
                                   onPressed: () {
                                     Navigator.pop(context);
                                     _regenerateBackupCodes();
                                   },
-                                  child: const Text("Regenerate"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                  child: Text(
+                                    "Regenerate",
+                                    style:
+                                        GoogleFonts.inter(color: Colors.white),
+                                  ),
                                 ),
                               ],
                             ),
@@ -1147,8 +1448,8 @@ class _ProfilePageState extends State<ProfilePage>
                         child: OutlinedButton(
                           onPressed: _mfaLoading ? null : _showDisableMfaDialog,
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            side: const BorderSide(color: Colors.red),
+                            foregroundColor: Colors.redAccent,
+                            side: BorderSide(color: Colors.redAccent),
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -1161,15 +1462,21 @@ class _ProfilePageState extends State<ProfilePage>
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.red),
+                                        Colors.redAccent),
                                   ),
                                 )
-                              : const Row(
+                              : Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.remove_circle_outline),
-                                    SizedBox(width: 8),
-                                    Text("Disable 2FA"),
+                                    Icon(Icons.remove_circle_outline, size: 20),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      "Disable 2FA",
+                                      style: GoogleFonts.inter(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                   ],
                                 ),
                         ),
@@ -1183,7 +1490,7 @@ class _ProfilePageState extends State<ProfilePage>
 
           // Security Tips Card
           if (_mfaEnabled) ...[
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             _modernCard(
               "Security Tips",
               Column(
@@ -1199,22 +1506,21 @@ class _ProfilePageState extends State<ProfilePage>
                     "Use Authenticator App",
                     "We recommend using Google Authenticator, Authy, or Microsoft Authenticator.",
                     Icons.security,
-                    color: Colors.blue,
+                    color: Colors.redAccent,
                   ),
                   _securityTip(
                     "Secure Your Device",
                     "Make sure your phone is protected with a PIN, pattern, or biometric lock.",
                     Icons.phone_android,
-                    color: Colors.green,
+                    color: Colors.blue,
                   ),
                 ],
               ),
-              headerColor: Colors.blue.withOpacity(0.1),
             ),
           ],
 
           // How It Works Card
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           _modernCard(
             "How It Works",
             Column(
@@ -1230,7 +1536,6 @@ class _ProfilePageState extends State<ProfilePage>
                     "Your account is now protected with 2FA"),
               ],
             ),
-            headerColor: Colors.purple.withOpacity(0.1),
           ),
         ],
       ),
@@ -1239,8 +1544,6 @@ class _ProfilePageState extends State<ProfilePage>
 
   Widget _mfaOption(String title, String subtitle, IconData icon,
       {required VoidCallback onTap}) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Material(
@@ -1252,18 +1555,19 @@ class _ProfilePageState extends State<ProfilePage>
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade200),
+              color: Colors.grey.shade50,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade200),
             ),
             child: Row(
               children: [
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.redAccent.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(icon, color: Colors.blue, size: 20),
+                  child: Icon(icon, color: Colors.redAccent, size: 20),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -1275,24 +1579,21 @@ class _ProfilePageState extends State<ProfilePage>
                         style: GoogleFonts.inter(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: themeProvider.isDarkMode
-                              ? Colors.white
-                              : Colors.grey.shade800,
+                          color: Colors.black,
                         ),
                       ),
+                      const SizedBox(height: 4),
                       Text(
                         subtitle,
                         style: GoogleFonts.inter(
                           fontSize: 14,
-                          color: themeProvider.isDarkMode
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade600,
+                          color: Colors.black54,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(Icons.chevron_right, color: Colors.grey),
+                Icon(Icons.chevron_right, color: Colors.grey.shade400),
               ],
             ),
           ),
@@ -1303,8 +1604,6 @@ class _ProfilePageState extends State<ProfilePage>
 
   Widget _securityTip(String title, String content, IconData icon,
       {Color color = Colors.blue}) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -1328,9 +1627,7 @@ class _ProfilePageState extends State<ProfilePage>
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: themeProvider.isDarkMode
-                        ? Colors.white
-                        : Colors.grey.shade800,
+                    color: Colors.black,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1338,9 +1635,7 @@ class _ProfilePageState extends State<ProfilePage>
                   content,
                   style: GoogleFonts.inter(
                     fontSize: 13,
-                    color: themeProvider.isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
+                    color: Colors.black54,
                   ),
                 ),
               ],
@@ -1352,8 +1647,6 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _howItWorksStep(int step, String title, String description) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -1369,7 +1662,7 @@ class _ProfilePageState extends State<ProfilePage>
             child: Center(
               child: Text(
                 step.toString(),
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
@@ -1387,18 +1680,14 @@ class _ProfilePageState extends State<ProfilePage>
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: themeProvider.isDarkMode
-                        ? Colors.white
-                        : Colors.grey.shade800,
+                    color: Colors.black,
                   ),
                 ),
                 Text(
                   description,
                   style: GoogleFonts.inter(
                     fontSize: 13,
-                    color: themeProvider.isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
+                    color: Colors.black54,
                   ),
                 ),
               ],
@@ -1409,10 +1698,8 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-// ----- Profile Summary -----
+  // Profile Summary
   Widget _buildProfileSummary() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
     Future<void> _launchUrl(String url) async {
       final uri = Uri.tryParse(url) ?? Uri();
       if (await canLaunchUrl(uri)) {
@@ -1425,7 +1712,6 @@ class _ProfilePageState extends State<ProfilePage>
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1437,9 +1723,7 @@ class _ProfilePageState extends State<ProfilePage>
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: themeProvider.isDarkMode
-                        ? const Color(0xFF14131E)
-                        : Colors.white,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: [
                       BoxShadow(
@@ -1448,7 +1732,7 @@ class _ProfilePageState extends State<ProfilePage>
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.arrow_back, color: Colors.redAccent),
+                  child: Icon(Icons.arrow_back, color: Colors.redAccent),
                 ),
               ),
               const SizedBox(width: 12),
@@ -1456,41 +1740,43 @@ class _ProfilePageState extends State<ProfilePage>
                 "Profile Overview",
                 style: GoogleFonts.poppins(
                   fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: themeProvider.isDarkMode
-                      ? Colors.white
-                      : Colors.grey.shade900,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.black,
                 ),
               ),
               const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.redAccent.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
+              ElevatedButton.icon(
+                onPressed: () => setState(() => showProfileSummary = false),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  elevation: 0,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.edit, color: Colors.redAccent, size: 16),
-                    const SizedBox(width: 6),
-                    GestureDetector(
-                      onTap: () => setState(() => showProfileSummary = false),
-                      child: Text(
-                        "Edit Profile",
-                        style: GoogleFonts.inter(
-                          color: Colors.redAccent,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ),
-                  ],
+                icon: Icon(Icons.edit, size: 16),
+                label: Text(
+                  "Edit Profile",
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
+          Text(
+            "View and manage your profile information",
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 30),
 
           // Personal Information Card
           _modernCard(
@@ -1505,31 +1791,28 @@ class _ProfilePageState extends State<ProfilePage>
                 _infoRow("Nationality", nationalityController.text),
                 _infoRow("Title", titleController.text),
                 if (bioController.text.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+                  Divider(color: Colors.grey.shade100),
+                  const SizedBox(height: 16),
                   Text(
                     "Bio",
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: themeProvider.isDarkMode
-                          ? Colors.white
-                          : Colors.grey.shade700,
+                      color: Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 8),
                   Text(
                     bioController.text,
                     style: GoogleFonts.inter(
                       fontSize: 14,
-                      color: themeProvider.isDarkMode
-                          ? Colors.grey.shade400
-                          : Colors.grey.shade600,
+                      color: Colors.black54,
                     ),
                   ),
                 ],
               ],
             ),
-            headerColor: Colors.blue.withOpacity(0.1),
           ),
 
           // Education & Skills Card
@@ -1545,30 +1828,30 @@ class _ProfilePageState extends State<ProfilePage>
                 if (graduationYearController.text.isNotEmpty)
                   _infoRow("Graduation Year", graduationYearController.text),
                 if (skillsController.text.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 16),
+                  Divider(color: Colors.grey.shade100),
+                  const SizedBox(height: 16),
                   Text(
                     "Skills",
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: themeProvider.isDarkMode
-                          ? Colors.white
-                          : Colors.grey.shade700,
+                      color: Colors.black,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
-                    runSpacing: 6,
+                    runSpacing: 8,
                     children: skillsController.text.split(',').map((skill) {
                       final trimmedSkill = skill.trim();
                       if (trimmedSkill.isEmpty) return const SizedBox.shrink();
                       return Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 6),
+                            horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(
                           color: Colors.redAccent.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
                           trimmedSkill,
@@ -1584,7 +1867,6 @@ class _ProfilePageState extends State<ProfilePage>
                 ],
               ],
             ),
-            headerColor: Colors.green.withOpacity(0.1),
           ),
 
           // Online Profiles Card
@@ -1606,7 +1888,6 @@ class _ProfilePageState extends State<ProfilePage>
                         "Portfolio", portfolioController.text, Icons.public),
                 ],
               ),
-              headerColor: Colors.purple.withOpacity(0.1),
             ),
         ],
       ),
@@ -1614,36 +1895,29 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _infoRow(String label, String value) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
     if (value.isEmpty) return const SizedBox.shrink();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 140,
             child: Text(
               label,
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: themeProvider.isDarkMode
-                    ? Colors.white
-                    : Colors.grey.shade700,
+                color: Colors.black87,
               ),
             ),
           ),
-          const SizedBox(width: 16),
           Expanded(
             child: Text(
               value,
               style: GoogleFonts.inter(
                 fontSize: 14,
-                color: themeProvider.isDarkMode
-                    ? Colors.grey.shade400
-                    : Colors.grey.shade600,
+                color: Colors.black54,
               ),
             ),
           ),
@@ -1653,13 +1927,11 @@ class _ProfilePageState extends State<ProfilePage>
   }
 
   Widget _linkRow(String label, String value, IconData icon) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
-          Icon(icon, color: Colors.redAccent, size: 18),
+          Icon(icon, color: Colors.redAccent, size: 20),
           const SizedBox(width: 12),
           SizedBox(
             width: 80,
@@ -1668,13 +1940,11 @@ class _ProfilePageState extends State<ProfilePage>
               style: GoogleFonts.inter(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: themeProvider.isDarkMode
-                    ? Colors.white
-                    : Colors.grey.shade700,
+                color: Colors.black87,
               ),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 20),
           Expanded(
             child: GestureDetector(
               onTap: () {
@@ -1696,80 +1966,210 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  // ----- Profile Form -----
+  // Profile Form
+  // Profile Form - Fixed dropdown values
   Widget _buildProfileForm() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+    // Define dropdown options - Use unique values
+    final List<Map<String, String>> genderOptions = [
+      {'value': '', 'label': 'Select Gender'},
+      {'value': 'male', 'label': 'Male'},
+      {'value': 'female', 'label': 'Female'},
+      {'value': 'other', 'label': 'Other'},
+      {'value': 'prefer_not_to_say', 'label': 'Prefer not to say'}
+    ];
+
+    final List<Map<String, String>> nationalityOptions = [
+      {'value': '', 'label': 'Select Nationality'},
+      {'value': 'south_african', 'label': 'South African'},
+      {'value': 'tanzanian', 'label': 'Tanzanian'},
+      {'value': 'ugandan', 'label': 'Ugandan'},
+      {'value': 'rwandan', 'label': 'Rwandan'},
+      {'value': 'burundian', 'label': 'Burundian'},
+      {'value': 'south_sudanese', 'label': 'South Sudanese'},
+      {'value': 'other', 'label': 'Other'}
+    ];
+
+    final List<Map<String, String>> titleOptions = [
+      {'value': '', 'label': 'Select Title'},
+      {'value': 'mr', 'label': 'Mr.'},
+      {'value': 'mrs', 'label': 'Mrs.'},
+      {'value': 'ms', 'label': 'Ms.'},
+      {'value': 'miss', 'label': 'Miss'},
+      {'value': 'dr', 'label': 'Dr.'},
+      {'value': 'prof', 'label': 'Prof.'},
+      {'value': 'eng', 'label': 'Eng.'},
+      {'value': 'other', 'label': 'Other'}
+    ];
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
       child: Column(
         children: [
-          // Header
-          Row(
-            children: [
-              IconButton(
-                onPressed: () => setState(() => showProfileSummary = true),
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: themeProvider.isDarkMode
-                        ? const Color(0xFF14131E)
-                        : Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 8,
+          // Modern Header with gradient
+          Container(
+            margin: const EdgeInsets.only(bottom: 30),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.redAccent.withOpacity(0.1),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+              border: Border.all(
+                color: Colors.grey.shade100,
+                width: 1,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    IconButton(
+                      onPressed: () =>
+                          setState(() => showProfileSummary = true),
+                      icon: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(Icons.arrow_back_rounded,
+                            color: Colors.redAccent, size: 20),
                       ),
-                    ],
-                  ),
-                  child: const Icon(Icons.arrow_back, color: Colors.redAccent),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Edit Profile",
+                            style: GoogleFonts.poppins(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.black,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "Update your profile information",
+                            style: GoogleFonts.inter(
+                              fontSize: 14,
+                              color: Colors.grey.shade600,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: updateProfile,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.redAccent,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 14),
+                        shadowColor: Colors.redAccent.withOpacity(0.3),
+                      ),
+                      icon: Icon(Icons.save_rounded, size: 18),
+                      label: Text(
+                        "Save Changes",
+                        style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              Text(
-                "Edit Profile",
-                style: GoogleFonts.poppins(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: themeProvider.isDarkMode
-                      ? Colors.white
-                      : Colors.grey.shade900,
-                ),
-              ),
-            ],
+                const SizedBox(height: 20),
+                Divider(color: Colors.grey.shade200, height: 1),
+              ],
+            ),
           ),
-          const SizedBox(height: 24),
 
+          // Profile Picture Section
           _modernCard(
-            "Personal Information",
+            "Profile Picture",
             Column(
               children: [
                 GestureDetector(
                   onTap: _pickProfileImage,
                   child: Stack(
                     children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundImage: _getProfileImageProvider(),
+                      Container(
+                        width: 140,
+                        height: 140,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.redAccent.withOpacity(0.1),
+                              Colors.redAccent.withOpacity(0.3),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(
+                            color: Colors.redAccent.withOpacity(0.3),
+                            width: 3,
+                          ),
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(70),
+                          child: Image(
+                            image: _getProfileImageProvider(),
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                Container(
+                              decoration: BoxDecoration(
+                                color: Colors.grey.shade100,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.person,
+                                color: Colors.grey.shade400,
+                                size: 50,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                       Positioned(
-                        bottom: 0,
-                        right: 0,
+                        bottom: 8,
+                        right: 8,
                         child: Container(
-                          padding: const EdgeInsets.all(8),
+                          width: 40,
+                          height: 40,
                           decoration: BoxDecoration(
                             color: Colors.redAccent,
                             shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.redAccent.withOpacity(0.4),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
                             border: Border.all(
                               color: Colors.white,
-                              width: 2,
+                              width: 3,
                             ),
                           ),
                           child: const Icon(
-                            Icons.camera_alt,
+                            Icons.camera_alt_rounded,
                             color: Colors.white,
-                            size: 20,
+                            size: 18,
                           ),
                         ),
                       ),
@@ -1777,113 +2177,652 @@ class _ProfilePageState extends State<ProfilePage>
                   ),
                 ),
                 const SizedBox(height: 20),
-                CustomTextField(
-                    label: "Full Name", controller: fullNameController),
-                const SizedBox(height: 12),
-                CustomTextField(label: "Email", controller: emailController),
-                const SizedBox(height: 12),
-                CustomTextField(label: "Phone", controller: phoneController),
-                const SizedBox(height: 12),
-                CustomTextField(label: "Gender", controller: genderController),
-                const SizedBox(height: 12),
-                CustomTextField(
-                    label: "Date of Birth", controller: dobController),
-                const SizedBox(height: 12),
-                CustomTextField(
-                    label: "Nationality", controller: nationalityController),
-                const SizedBox(height: 12),
-                CustomTextField(
-                    label: "ID Number", controller: idNumberController),
-                const SizedBox(height: 12),
-                CustomTextField(label: "Bio", controller: bioController),
-                const SizedBox(height: 12),
-                CustomTextField(
-                    label: "Location", controller: locationController),
-                const SizedBox(height: 12),
-                CustomTextField(label: "Title", controller: titleController),
+                Text(
+                  "Tap the camera icon to update your profile photo",
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
 
+          // Personal Information
           _modernCard(
-            "Education & Skills",
+            "Personal Information",
             Column(
               children: [
-                CustomTextField(label: "Degree", controller: degreeController),
-                const SizedBox(height: 12),
+                // Title dropdown
+                _buildStyledDropdown(
+                  label: "Title",
+                  value: _selectedTitle?.toLowerCase(),
+                  options: titleOptions,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedTitle = newValue == '' ? null : newValue;
+                      titleController.text = titleOptions.firstWhere(
+                        (opt) => opt['value'] == newValue,
+                        orElse: () => {'label': '', 'value': ''},
+                      )['label']!;
+                    });
+                  },
+                ),
+                const SizedBox(height: 20),
+
                 CustomTextField(
-                    label: "Institution", controller: institutionController),
-                const SizedBox(height: 12),
+                  label: "Full Name",
+                  controller: fullNameController,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  prefixIcon: Icon(Icons.person_outline_rounded, size: 20),
+                ),
+                const SizedBox(height: 20),
+
                 CustomTextField(
-                    label: "Graduation Year",
-                    controller: graduationYearController),
-                const SizedBox(height: 12),
+                  label: "Email",
+                  controller: emailController,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  prefixIcon: Icon(Icons.email_outlined, size: 20),
+                ),
+                const SizedBox(height: 20),
+
                 CustomTextField(
-                    label: "Skills (comma separated)",
-                    controller: skillsController),
+                  label: "Phone",
+                  controller: phoneController,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  prefixIcon: Icon(Icons.phone_outlined, size: 20),
+                  inputType: TextInputType.phone,
+                ),
+                const SizedBox(height: 20),
+
+                // Gender dropdown
+                _buildStyledDropdown(
+                  label: "Gender",
+                  value: _selectedGender?.toLowerCase(),
+                  options: genderOptions,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedGender = newValue == '' ? null : newValue;
+                      genderController.text = genderOptions.firstWhere(
+                        (opt) => opt['value'] == newValue,
+                        orElse: () => {'label': '', 'value': ''},
+                      )['label']!;
+                    });
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                // Date of Birth
+                _buildDatePickerField(),
+                const SizedBox(height: 20),
+
+                // Nationality dropdown
+                _buildStyledDropdown(
+                  label: "Nationality",
+                  value: _selectedNationality?.toLowerCase(),
+                  options: nationalityOptions,
+                  onChanged: (String? newValue) {
+                    setState(() {
+                      _selectedNationality = newValue == '' ? null : newValue;
+                      nationalityController.text =
+                          nationalityOptions.firstWhere(
+                        (opt) => opt['value'] == newValue,
+                        orElse: () => {'label': '', 'value': ''},
+                      )['label']!;
+                    });
+                  },
+                ),
+                const SizedBox(height: 20),
+
+                CustomTextField(
+                  label: "ID Number",
+                  controller: idNumberController,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                ),
+                const SizedBox(height: 20),
+
+                CustomTextField(
+                  label: "Bio",
+                  controller: bioController,
+                  maxLines: 4,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  hintText: "Tell us about yourself...",
+                  prefixIcon: Icon(Icons.description_outlined, size: 20),
+                ),
+                const SizedBox(height: 20),
+
+                CustomTextField(
+                  label: "Location",
+                  controller: locationController,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+                  hintText: "City, Country",
+                ),
               ],
             ),
           ),
 
+          // Education Section
+          _modernCard(
+            "Education",
+            Column(
+              children: [
+                ..._educationControllers.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final controller = entry.value;
+                  return Container(
+                    margin: EdgeInsets.only(
+                      bottom:
+                          index == _educationControllers.length - 1 ? 0 : 20,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: CustomTextField(
+                            label: index == 0
+                                ? "Education"
+                                : "Additional Education",
+                            controller: controller,
+                            maxLines: 2,
+                            backgroundColor: Colors.transparent,
+                            borderColor: Colors.grey.shade300,
+                            focusedBorderColor: Colors.redAccent,
+                            borderRadius: 12,
+                            borderWidth: 1.5,
+                            focusedBorderWidth: 2,
+                            textColor: Colors.black87,
+                            labelColor: Colors.grey.shade700,
+                            hintColor: Colors.grey.shade500,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                            hintText:
+                                "e.g., BSc Computer Science at University (2020)",
+                            prefixIcon: Icon(
+                              Icons.school_outlined,
+                              size: 20,
+                              color: index == 0
+                                  ? Colors.redAccent
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                        if (_educationControllers.length > 1)
+                          Container(
+                            margin: const EdgeInsets.only(left: 12),
+                            child: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _educationControllers.removeAt(index);
+                                });
+                              },
+                              icon: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.remove_rounded,
+                                  color: Colors.redAccent,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+
+                // Add more education button
+                Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _educationControllers.add(TextEditingController());
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.redAccent,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: Colors.redAccent.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                    icon: Icon(
+                      Icons.add_circle_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 20,
+                    ),
+                    label: Text(
+                      "Add Another Education",
+                      style: GoogleFonts.inter(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Skills Section
+          _modernCard(
+            "Skills",
+            Column(
+              children: [
+                CustomTextField(
+                  label: "Skills (comma separated)",
+                  controller: skillsController,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  hintText: "e.g., Python, Flutter, React, Project Management",
+                  prefixIcon: Icon(Icons.code_outlined, size: 20),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+
+          // Work Experience Section
           _modernCard(
             "Work Experience",
             Column(
               children: [
                 CustomTextField(
-                    label: "Job Title", controller: jobTitleController),
-                const SizedBox(height: 12),
-                CustomTextField(
-                    label: "Company", controller: companyController),
-                const SizedBox(height: 12),
-                CustomTextField(
-                    label: "Years of Experience",
-                    controller: yearsOfExpController),
-                const SizedBox(height: 12),
-                CustomTextField(
-                    label: "Work Experience Details",
-                    controller: workExpController,
-                    maxLines: 4),
+                  label: "Job Title",
+                  controller: jobTitleController,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  prefixIcon: Icon(Icons.work_outline_rounded, size: 20),
+                ),
+                const SizedBox(height: 20),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: CustomTextField(
+                        label: "Company",
+                        controller: companyController,
+                        backgroundColor: Colors.transparent,
+                        borderColor: Colors.grey.shade300,
+                        focusedBorderColor: Colors.redAccent,
+                        borderRadius: 12,
+                        borderWidth: 1.5,
+                        focusedBorderWidth: 2,
+                        textColor: Colors.black87,
+                        labelColor: Colors.grey.shade700,
+                        hintColor: Colors.grey.shade500,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        prefixIcon: Icon(Icons.business_outlined, size: 20),
+                      ),
+                    ),
+                    const SizedBox(width: 20),
+                    Expanded(
+                      child: CustomTextField(
+                        label: "Years of Experience",
+                        controller: yearsOfExpController,
+                        backgroundColor: Colors.transparent,
+                        borderColor: Colors.grey.shade300,
+                        focusedBorderColor: Colors.redAccent,
+                        borderRadius: 12,
+                        borderWidth: 1.5,
+                        focusedBorderWidth: 2,
+                        textColor: Colors.black87,
+                        labelColor: Colors.grey.shade700,
+                        hintColor: Colors.grey.shade500,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                        prefixIcon: Icon(Icons.timeline_outlined, size: 20),
+                        inputType: TextInputType.number,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+
+                // Dynamic work experience entries
+                ..._workExpControllers.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final controller = entry.value;
+                  return Container(
+                    margin: EdgeInsets.only(
+                      bottom: index == _workExpControllers.length - 1 ? 0 : 20,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: CustomTextField(
+                            label: index == 0
+                                ? "Work Experience Details"
+                                : "Additional Experience",
+                            controller: controller,
+                            maxLines: 3,
+                            backgroundColor: Colors.transparent,
+                            borderColor: Colors.grey.shade300,
+                            focusedBorderColor: Colors.redAccent,
+                            borderRadius: 12,
+                            borderWidth: 1.5,
+                            focusedBorderWidth: 2,
+                            textColor: Colors.black87,
+                            labelColor: Colors.grey.shade700,
+                            hintColor: Colors.grey.shade500,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                            hintText:
+                                "Describe your responsibilities and achievements...",
+                            prefixIcon: Icon(
+                              Icons.description_outlined,
+                              size: 20,
+                              color: index == 0
+                                  ? Colors.redAccent
+                                  : Colors.grey.shade600,
+                            ),
+                          ),
+                        ),
+                        if (_workExpControllers.length > 1)
+                          Container(
+                            margin: const EdgeInsets.only(left: 12),
+                            child: IconButton(
+                              onPressed: () {
+                                setState(() {
+                                  _workExpControllers.removeAt(index);
+                                });
+                              },
+                              icon: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.redAccent.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Icon(
+                                  Icons.remove_rounded,
+                                  color: Colors.redAccent,
+                                  size: 18,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+
+                // Add more experience button
+                Container(
+                  margin: const EdgeInsets.only(top: 10),
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _workExpControllers.add(TextEditingController());
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.transparent,
+                      foregroundColor: Colors.redAccent,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(
+                          color: Colors.redAccent.withOpacity(0.3),
+                          width: 1.5,
+                        ),
+                      ),
+                    ),
+                    icon: Icon(
+                      Icons.add_circle_outline_rounded,
+                      color: Colors.redAccent,
+                      size: 20,
+                    ),
+                    label: Text(
+                      "Add Another Experience",
+                      style: GoogleFonts.inter(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
 
+          // Online Profiles Section
           _modernCard(
-            "Online Profiles & CV",
+            "Online Profiles",
             Column(
               children: [
                 CustomTextField(
-                    label: "LinkedIn", controller: linkedinController),
-                const SizedBox(height: 12),
-                CustomTextField(label: "GitHub", controller: githubController),
-                const SizedBox(height: 12),
-                CustomTextField(
-                    label: "Portfolio", controller: portfolioController),
-                const SizedBox(height: 12),
-                CustomTextField(
-                    label: "CV Text",
-                    controller: cvTextController,
-                    maxLines: 4),
-                const SizedBox(height: 12),
-                CustomTextField(label: "CV URL", controller: cvUrlController),
+                  label: "LinkedIn",
+                  controller: linkedinController,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  hintText: "https://linkedin.com/in/yourprofile",
+                  prefixIcon: Icon(Icons.link_outlined, size: 20),
+                ),
                 const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: updateProfile,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                CustomTextField(
+                  label: "GitHub",
+                  controller: githubController,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  hintText: "https://github.com/yourusername",
+                  prefixIcon: Icon(Icons.code_outlined, size: 20),
+                ),
+                const SizedBox(height: 20),
+                CustomTextField(
+                  label: "Portfolio",
+                  controller: portfolioController,
+                  backgroundColor: Colors.transparent,
+                  borderColor: Colors.grey.shade300,
+                  focusedBorderColor: Colors.redAccent,
+                  borderRadius: 12,
+                  borderWidth: 1.5,
+                  focusedBorderWidth: 2,
+                  textColor: Colors.black87,
+                  labelColor: Colors.grey.shade700,
+                  hintColor: Colors.grey.shade500,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  hintText: "https://yourportfolio.com",
+                  prefixIcon: Icon(Icons.public_outlined, size: 20),
+                ),
+              ],
+            ),
+          ),
+
+          // Save Button Section
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 40),
+            child: Column(
+              children: [
+                ElevatedButton(
+                  onPressed: updateProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 40,
+                      vertical: 18,
                     ),
-                    child: Text(
-                      "Save Profile",
-                      style: GoogleFonts.inter(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    elevation: 0,
+                    shadowColor: Colors.redAccent.withOpacity(0.4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.save_rounded, size: 20),
+                      const SizedBox(width: 10),
+                      Text(
+                        "Save All Changes",
+                        style: GoogleFonts.inter(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                        ),
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () => setState(() => showProfileSummary = true),
+                  child: Text(
+                    "Cancel",
+                    style: GoogleFonts.inter(
+                      color: Colors.grey.shade600,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
@@ -1895,12 +2834,186 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
-  // ----- Settings Tab -----
-  Widget _buildSettingsTab() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
+// Helper method for styled dropdown
+  Widget _buildStyledDropdown({
+    required String label,
+    required String? value,
+    required List<Map<String, String>> options,
+    required Function(String?) onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.grey.shade300,
+              width: 1.5,
+            ),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: value,
+              isExpanded: true,
+              items: options.map((Map<String, String> option) {
+                return DropdownMenuItem<String>(
+                  value: option['value'],
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text(
+                      option['label']!,
+                      style: GoogleFonts.inter(
+                        color: option['value']!.isEmpty
+                            ? Colors.grey.shade500
+                            : Colors.black87,
+                        fontSize: 15,
+                        fontWeight: option['value']!.isEmpty
+                            ? FontWeight.w400
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+              onChanged: onChanged,
+              hint: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Select $label',
+                  style: GoogleFonts.inter(
+                    color: Colors.grey.shade500,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+              icon: Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Icon(
+                  Icons.arrow_drop_down_rounded,
+                  color: Colors.grey.shade600,
+                  size: 24,
+                ),
+              ),
+              dropdownColor: Colors.white,
+              elevation: 4,
+              borderRadius: BorderRadius.circular(12),
+              style: GoogleFonts.inter(
+                color: Colors.black87,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
+// Helper method for date picker field
+  Widget _buildDatePickerField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          "Date of Birth",
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade700,
+          ),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () async {
+            final DateTime? picked = await showDatePicker(
+              context: context,
+              initialDate: _selectedDate ??
+                  DateTime.now().subtract(const Duration(days: 365 * 18)),
+              firstDate: DateTime(1900),
+              lastDate: DateTime.now().subtract(const Duration(days: 365 * 16)),
+              builder: (context, child) {
+                return Theme(
+                  data: ThemeData.light().copyWith(
+                    colorScheme: ColorScheme.light(
+                      primary: Colors.redAccent,
+                      onPrimary: Colors.white,
+                      surface: Colors.white,
+                    ),
+                    dialogTheme: DialogThemeData(backgroundColor: Colors.white),
+                  ),
+                  child: child!,
+                );
+              },
+            );
+            if (picked != null) {
+              setState(() {
+                _selectedDate = picked;
+                dobController.text = DateFormat('yyyy-MM-dd').format(picked);
+              });
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.grey.shade300,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_today_rounded,
+                  color: Colors.grey.shade600,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    _selectedDate != null
+                        ? DateFormat('MMMM dd, yyyy').format(_selectedDate!)
+                        : 'Select Date',
+                    style: GoogleFonts.inter(
+                      color: _selectedDate != null
+                          ? Colors.black87
+                          : Colors.grey.shade500,
+                      fontSize: 15,
+                      fontWeight: _selectedDate != null
+                          ? FontWeight.w500
+                          : FontWeight.w400,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_drop_down_rounded,
+                  color: Colors.grey.shade600,
+                  size: 24,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Settings Tab
+  Widget _buildSettingsTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1908,13 +3021,19 @@ class _ProfilePageState extends State<ProfilePage>
             "Settings",
             style: GoogleFonts.poppins(
               fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: themeProvider.isDarkMode
-                  ? Colors.white
-                  : Colors.grey.shade900,
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
+          Text(
+            "Manage your account preferences",
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 30),
           _modernCard(
             "Preferences",
             Column(
@@ -1966,11 +3085,12 @@ class _ProfilePageState extends State<ProfilePage>
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      elevation: 0,
                     ),
                     child: Text(
                       "Save Settings",
                       style: GoogleFonts.inter(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -1986,10 +3106,8 @@ class _ProfilePageState extends State<ProfilePage>
 
   Widget _settingsSwitch(String title, String subtitle, IconData icon,
       bool value, Function(bool) onChanged) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+      margin: const EdgeInsets.only(bottom: 20),
       child: Row(
         children: [
           Container(
@@ -2010,24 +3128,21 @@ class _ProfilePageState extends State<ProfilePage>
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: themeProvider.isDarkMode
-                        ? Colors.white
-                        : Colors.grey.shade800,
+                    color: Colors.black,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
                   subtitle,
                   style: GoogleFonts.inter(
                     fontSize: 14,
-                    color: themeProvider.isDarkMode
-                        ? Colors.grey.shade400
-                        : Colors.grey.shade600,
+                    color: Colors.black54,
                   ),
                 ),
               ],
             ),
           ),
-          Switch(
+          Switch.adaptive(
             value: value,
             onChanged: onChanged,
             activeColor: Colors.redAccent,
@@ -2037,8 +3152,8 @@ class _ProfilePageState extends State<ProfilePage>
     );
   }
 
+  // Reset Password Tab
   Widget _buildResetPasswordTab() {
-    final themeProvider = Provider.of<ThemeProvider>(context);
     final TextEditingController currentPassword = TextEditingController();
     final TextEditingController newPassword = TextEditingController();
     final TextEditingController confirmPassword = TextEditingController();
@@ -2094,7 +3209,6 @@ class _ProfilePageState extends State<ProfilePage>
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2102,13 +3216,19 @@ class _ProfilePageState extends State<ProfilePage>
             "Reset Password",
             style: GoogleFonts.poppins(
               fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: themeProvider.isDarkMode
-                  ? Colors.white
-                  : Colors.grey.shade900,
+              fontWeight: FontWeight.w700,
+              color: Colors.black,
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 8),
+          Text(
+            "Change your account password",
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              color: Colors.black54,
+            ),
+          ),
+          const SizedBox(height: 30),
           _modernCard(
             "Change Password",
             Column(
@@ -2117,31 +3237,35 @@ class _ProfilePageState extends State<ProfilePage>
                   label: "Current Password",
                   controller: currentPassword,
                   obscureText: true,
+                  textColor: Colors.black,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 CustomTextField(
                   label: "New Password",
                   controller: newPassword,
                   obscureText: true,
+                  textColor: Colors.black,
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 CustomTextField(
                   label: "Confirm New Password",
                   controller: confirmPassword,
                   obscureText: true,
+                  textColor: Colors.black,
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 30),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: isLoading ? null : changePassword,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
+                      backgroundColor: const Color.fromARGB(255, 208, 32, 51),
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: const EdgeInsets.symmetric(vertical: 18),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
+                      elevation: 0,
                     ),
                     child: isLoading
                         ? const SizedBox(
@@ -2156,7 +3280,7 @@ class _ProfilePageState extends State<ProfilePage>
                         : Text(
                             "Reset Password",
                             style: GoogleFonts.inter(
-                              fontSize: 16,
+                              fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
                           ),

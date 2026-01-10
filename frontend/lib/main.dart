@@ -14,6 +14,7 @@ import 'screens/admin/profile_page.dart';
 import 'screens/auth/oath_callback_screen.dart';
 import 'screens/auth/mfa_verification_screen.dart';
 import 'screens/auth/sso_handler_screen.dart';
+import 'screens/hr/hr_dashboard.dart';
 
 import 'providers/theme_provider.dart';
 import 'utils/theme_utils.dart';
@@ -95,6 +96,14 @@ final GoRouter _router = GoRouter(
           final token = state.uri.queryParameters['token'] ?? '';
           return HMMainDashboard(token: token);
         }),
+    // ✅ Add this new route
+    GoRoute(
+      path: '/hr-dashboard',
+      builder: (context, state) {
+        final token = state.uri.queryParameters['token'] ?? '';
+        return HRDashboard(token: token);
+      },
+    ),
     GoRoute(
       path: '/profile',
       builder: (context, state) {

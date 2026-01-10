@@ -15,7 +15,9 @@ class CVReviewsScreen extends StatefulWidget {
 class _CVReviewsScreenState extends State<CVReviewsScreen> {
   final AdminService admin = AdminService();
   List<Map<String, dynamic>> cvReviews = [];
+  List<Map<String, dynamic>> filteredReviews = [];
   bool loading = true;
+  String? selectedFilter;
 
   @override
   void initState() {
@@ -29,6 +31,7 @@ class _CVReviewsScreenState extends State<CVReviewsScreen> {
       final data = await admin.listCVReviews();
       setState(() {
         cvReviews = List<Map<String, dynamic>>.from(data);
+        filteredReviews = List.from(cvReviews);
       });
     } catch (e) {
       debugPrint("Error fetching CV reviews: $e");
@@ -47,6 +50,21 @@ class _CVReviewsScreenState extends State<CVReviewsScreen> {
     if (score >= 70) return 'Excellent';
     if (score >= 50) return 'Good';
     return 'Needs Review';
+  }
+
+  void applyFilter(String? filter) {
+    setState(() {
+      selectedFilter = filter;
+      if (filter == null) {
+        filteredReviews = List.from(cvReviews);
+      } else {
+        filteredReviews = cvReviews.where((review) {
+          final score = (review['cv_score'] ?? 0).toDouble();
+          final label = getScoreLabel(score);
+          return label == filter;
+        }).toList();
+      }
+    });
   }
 
   @override
@@ -198,7 +216,7 @@ class _CVReviewsScreenState extends State<CVReviewsScreen> {
                                         ),
                                       ),
                                       Text(
-                                        "${cvReviews.length} candidates reviewed",
+                                        "${filteredReviews.length} candidates ${selectedFilter != null ? '($selectedFilter)' : ''}",
                                         style: GoogleFonts.inter(
                                           color: themeProvider.isDarkMode
                                               ? Colors.grey.shade400
@@ -209,19 +227,76 @@ class _CVReviewsScreenState extends State<CVReviewsScreen> {
                                     ],
                                   ),
                                   const Spacer(),
+
+                                  // Filter Dropdown Button
                                   Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 8),
+                                        horizontal: 8),
                                     decoration: BoxDecoration(
                                       color: Colors.redAccent.withOpacity(0.1),
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: Text(
-                                      "Active Reviews",
-                                      style: GoogleFonts.inter(
-                                        color: Colors.redAccent,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 12,
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<String>(
+                                        value: selectedFilter,
+                                        icon: Icon(
+                                          Icons.filter_list,
+                                          color: Colors.redAccent,
+                                          size: 20,
+                                        ),
+                                        elevation: 16,
+                                        style: GoogleFonts.inter(
+                                          color: themeProvider.isDarkMode
+                                              ? Colors.white
+                                              : Colors.black87,
+                                          fontSize: 12,
+                                        ),
+                                        dropdownColor: themeProvider.isDarkMode
+                                            ? const Color(0xFF14131E)
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(12),
+                                        hint: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8),
+                                          child: Text(
+                                            "Filter by",
+                                            style: GoogleFonts.inter(
+                                              color: Colors.redAccent,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 12,
+                                            ),
+                                          ),
+                                        ),
+                                        onChanged: (String? newValue) {
+                                          applyFilter(newValue);
+                                        },
+                                        items: <String>[
+                                          'All',
+                                          'Excellent',
+                                          'Good',
+                                          'Needs Review'
+                                        ].map<DropdownMenuItem<String>>(
+                                            (String value) {
+                                          return DropdownMenuItem<String>(
+                                            value:
+                                                value == 'All' ? null : value,
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 8),
+                                              child: Text(
+                                                value,
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 12,
+                                                  color:
+                                                      themeProvider.isDarkMode
+                                                          ? Colors.white
+                                                          : Colors.black87,
+                                                ),
+                                              ),
+                                            ),
+                                          );
+                                        }).toList(),
                                       ),
                                     ),
                                   ),
@@ -240,9 +315,9 @@ class _CVReviewsScreenState extends State<CVReviewsScreen> {
                                   crossAxisSpacing: 20,
                                   childAspectRatio: 0.75,
                                 ),
-                                itemCount: cvReviews.length,
+                                itemCount: filteredReviews.length,
                                 itemBuilder: (_, index) {
-                                  final review = cvReviews[index];
+                                  final review = filteredReviews[index];
                                   final score =
                                       (review['cv_score'] ?? 0).toDouble();
                                   final scoreColor = getScoreColor(score);

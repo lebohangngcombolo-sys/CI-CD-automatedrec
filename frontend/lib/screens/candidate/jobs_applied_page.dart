@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../widgets/custom_card.dart';
-import '../../../services/candidate_service.dart';
+import '../../services/candidate_service.dart';
 
 class JobsAppliedPage extends StatefulWidget {
   final String token;

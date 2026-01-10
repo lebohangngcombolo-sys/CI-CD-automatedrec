@@ -119,7 +119,7 @@ class _CandidateDetailScreenState extends State<CandidateDetailScreen>
 
       final response = await http.get(
         Uri.parse(
-            'https://ci-cd-automatedrec.onrender.com/api/admin/applications/$applicationId/download-cv'),
+            'http://127.0.0.1:5000/api/admin/applications/$applicationId/download-cv'),
         headers: {
           'Authorization': 'Bearer $jwtToken',
           'Content-Type': 'application/json',

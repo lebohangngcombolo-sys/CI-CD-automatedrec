@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../../constants/app_colors.dart';
+import '../../constants/app_colors.dart';
 
 class InterviewScheduleDialog extends StatefulWidget {
   final String token;
   final int? candidateId;
 
-  const InterviewScheduleDialog({super.key, required this.token, this.candidateId});
+  const InterviewScheduleDialog(
+      {super.key, required this.token, this.candidateId});
 
   @override
-  State<InterviewScheduleDialog> createState() => _InterviewScheduleDialogState();
+  State<InterviewScheduleDialog> createState() =>
+      _InterviewScheduleDialogState();
 }
 
 class _InterviewScheduleDialogState extends State<InterviewScheduleDialog> {
@@ -27,7 +29,11 @@ class _InterviewScheduleDialogState extends State<InterviewScheduleDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Schedule Interview', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textDark)),
+            const Text('Schedule Interview',
+                style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textDark)),
             const SizedBox(height: 12),
             Form(
               key: _formKey,
@@ -35,17 +41,26 @@ class _InterviewScheduleDialogState extends State<InterviewScheduleDialog> {
                 children: [
                   TextFormField(
                     controller: _locationController,
-                    decoration: const InputDecoration(labelText: 'Location', border: OutlineInputBorder()),
-                    validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
+                    decoration: const InputDecoration(
+                        labelText: 'Location', border: OutlineInputBorder()),
+                    validator: (v) =>
+                        (v == null || v.isEmpty) ? 'Required' : null,
                   ),
                   const SizedBox(height: 12),
                   InkWell(
                     onTap: _pickDateTime,
                     child: InputDecorator(
-                      decoration: const InputDecoration(labelText: 'Date & Time', border: OutlineInputBorder()),
+                      decoration: const InputDecoration(
+                          labelText: 'Date & Time',
+                          border: OutlineInputBorder()),
                       child: Text(
-                        _dateTime != null ? _dateTime!.toLocal().toString() : 'Pick date and time',
-                        style: TextStyle(color: _dateTime != null ? AppColors.textDark : AppColors.textGrey),
+                        _dateTime != null
+                            ? _dateTime!.toLocal().toString()
+                            : 'Pick date and time',
+                        style: TextStyle(
+                            color: _dateTime != null
+                                ? AppColors.textDark
+                                : AppColors.textGrey),
                       ),
                     ),
                   ),
@@ -56,11 +71,15 @@ class _InterviewScheduleDialogState extends State<InterviewScheduleDialog> {
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel')),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: _submit,
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryRed, foregroundColor: AppColors.primaryWhite),
+                  style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryRed,
+                      foregroundColor: AppColors.primaryWhite),
                   child: const Text('Schedule'),
                 ),
               ],
@@ -80,10 +99,18 @@ class _InterviewScheduleDialogState extends State<InterviewScheduleDialog> {
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (date == null) { _isPicking = false; return; }
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-    if (time == null) { _isPicking = false; return; }
-    setState(() => _dateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute));
+    if (date == null) {
+      _isPicking = false;
+      return;
+    }
+    final time =
+        await showTimePicker(context: context, initialTime: TimeOfDay.now());
+    if (time == null) {
+      _isPicking = false;
+      return;
+    }
+    setState(() => _dateTime =
+        DateTime(date.year, date.month, date.day, time.hour, time.minute));
     _isPicking = false;
   }
 
@@ -101,4 +128,4 @@ class _InterviewScheduleDialogState extends State<InterviewScheduleDialog> {
     _locationController.dispose();
     super.dispose();
   }
-} 
+}

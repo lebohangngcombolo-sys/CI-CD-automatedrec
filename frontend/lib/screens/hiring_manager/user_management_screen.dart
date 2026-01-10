@@ -34,7 +34,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
       if (token == null) return;
 
       final response = await http.get(
-        Uri.parse("https://ci-cd-automatedrec.onrender.com/api/admin/users"),
+        Uri.parse("http://127.0.0.1:5000/api/admin/users"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
@@ -127,7 +127,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    value: role.isNotEmpty ? role : null,
+                    initialValue: role.isNotEmpty ? role : null,
                     items: roles
                         .map((r) => DropdownMenuItem(value: r, child: Text(r)))
                         .toList(),
@@ -161,7 +161,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
                             final response = await http.post(
                               Uri.parse(
-                                  "https://ci-cd-automatedrec.onrender.com/api/auth/admin-enroll"),
+                                  "http://127.0.0.1:5000/api/auth/admin-enroll"),
                               headers: {
                                 "Content-Type": "application/json",
                                 "Authorization": "Bearer $token",
@@ -241,7 +241,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     Text(errorMessage!,
                         style: const TextStyle(color: Colors.red)),
                   DropdownButtonFormField<String>(
-                    value: role,
+                    initialValue: role,
                     items: roles
                         .map((r) => DropdownMenuItem(value: r, child: Text(r)))
                         .toList(),
@@ -277,7 +277,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
 
                             final response = await http.put(
                               Uri.parse(
-                                  "https://ci-cd-automatedrec.onrender.com/api/admin/users/$userId"),
+                                  "http://127.0.0.1:5000/api/admin/users/$userId"),
                               headers: {
                                 "Content-Type": "application/json",
                                 "Authorization": "Bearer $token",

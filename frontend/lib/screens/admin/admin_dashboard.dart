@@ -25,6 +25,7 @@ import 'job_management.dart';
 import 'user_management_screen.dart';
 import '../../providers/theme_provider.dart';
 import 'analytics_dashboard.dart';
+import 'offer_list_screen.dart';
 
 class AdminDAshboard extends StatefulWidget {
   final String token;
@@ -93,8 +94,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
   Uint8List? _profileImageBytes;
   String _profileImageUrl = "";
   final ImagePicker _picker = ImagePicker();
-  final String apiBase =
-      "https://ci-cd-automatedrec.onrender.com/api/candidate";
+  final String apiBase = "http://127.0.0.1:5000/api/candidate";
 
   @override
   void initState() {
@@ -213,8 +213,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
       final token = await AuthService.getAccessToken();
 
       final res = await http.get(
-        Uri.parse(
-            "https://ci-cd-automatedrec.onrender.com/api/admin/recent-activities"),
+        Uri.parse("http://127.0.0.1:5000/api/admin/recent-activities"),
         headers: {"Authorization": "Bearer $token"},
       );
 
@@ -244,8 +243,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
     try {
       final token = await AuthService.getAccessToken();
       final res = await http.get(
-        Uri.parse(
-            "https://ci-cd-automatedrec.onrender.com/api/admin/powerbi/status"),
+        Uri.parse("http://127.0.0.1:5000/api/admin/powerbi/status"),
         headers: {"Authorization": "Bearer $token"},
       );
 
@@ -479,11 +477,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
                                         backgroundColor: Colors.grey.shade200,
                                         backgroundImage:
                                             _getProfileImageProvider(),
-                                        child:
-                                            _getProfileImageProvider() == null
-                                                ? const Icon(Icons.person,
-                                                    color: Colors.redAccent)
-                                                : null,
+                                        child: null,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
@@ -514,10 +508,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
                                       backgroundColor: Colors.grey.shade200,
                                       backgroundImage:
                                           _getProfileImageProvider(),
-                                      child: _getProfileImageProvider() == null
-                                          ? const Icon(Icons.person,
-                                              color: Colors.redAccent)
-                                          : null,
+                                      child: null,
                                     ),
                                   ),
                                 ),
@@ -650,7 +641,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
                                       onChanged: (value) {
                                         themeProvider.toggleTheme();
                                       },
-                                      activeColor: Colors.redAccent,
+                                      activeThumbColor: Colors.redAccent,
                                       inactiveTrackColor: Colors.grey.shade400,
                                     ),
                                   ],
@@ -731,24 +722,33 @@ class _AdminDAshboardState extends State<AdminDAshboard>
                                 const SizedBox(width: 8),
 
                                 TextButton.icon(
-                                  onPressed: () =>
-                                      setState(() => currentScreen = "jobs"),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) =>
+                                              AdminOfferListScreen()),
+                                    );
+                                  },
                                   icon: Image.asset(
-                                    // Changed from Icon to Image.asset
                                     'assets/icons/add.png',
                                     width: 30,
                                     height: 30,
                                     color:
                                         const Color.fromARGB(255, 193, 13, 0),
                                   ),
-                                  label: Text("Create",
-                                      style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          color: themeProvider.isDarkMode
-                                              ? Colors.white
-                                              : Colors.black87)),
+                                  label: Text(
+                                    "Create",
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      color: themeProvider.isDarkMode
+                                          ? Colors.white
+                                          : Colors.black87,
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
+
                                 IconButton(
                                   onPressed: () => setState(
                                       () => currentScreen = "notifications"),
@@ -771,10 +771,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
                                     radius: 18,
                                     backgroundColor: Colors.grey.shade200,
                                     backgroundImage: _getProfileImageProvider(),
-                                    child: _getProfileImageProvider() == null
-                                        ? const Icon(Icons.person,
-                                            color: Colors.redAccent)
-                                        : null,
+                                    child: null,
                                   ),
                                 ),
                               ],

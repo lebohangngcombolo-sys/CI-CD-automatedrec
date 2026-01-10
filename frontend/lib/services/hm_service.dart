@@ -1,11 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import '../models/hm_models.dart';
-import '../services/auth_service.dart';
+import 'auth_service.dart';
 
 class HMService {
-  static const String baseUrl =
-      'https://ci-cd-automatedrec.onrender.com/api/admin';
+  static const String baseUrl = 'http://127.0.0.1:5000/api/admin';
 
   Future<HMDashboardData> getDashboardData(String token) async {
     final response = await http.get(

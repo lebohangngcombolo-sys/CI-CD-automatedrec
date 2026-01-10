@@ -82,8 +82,7 @@ class _ProfilePageState extends State<ProfilePage>
 
   List<dynamic> documents = [];
 
-  final String apiBase =
-      "https://ci-cd-automatedrec.onrender.com/api/candidate";
+  final String apiBase = "http://127.0.0.1:5000/api/candidate";
 
   @override
   void initState() {
@@ -425,7 +424,7 @@ class _ProfilePageState extends State<ProfilePage>
                     }
                   },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: const Color(0xFF91271F),
             ),
             child: _mfaLoading
                 ? const SizedBox(
@@ -2029,7 +2028,7 @@ class _ProfilePageState extends State<ProfilePage>
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Colors.redAccent,
+            activeThumbColor: Colors.redAccent,
           ),
         ],
       ),

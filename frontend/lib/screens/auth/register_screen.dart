@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../../services/auth_service.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_textfield2.dart';
@@ -18,11 +19,15 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController firstNameController = TextEditingController();
-  final TextEditingController lastNameController = TextEditingController();
+
+  bool _obscurePassword = true;
   bool loading = false;
+
+  String passwordStrength = '';
+  Color passwordStrengthColor = Colors.red;
 
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -37,6 +42,7 @@ class _RegisterScreenState extends State<RegisterScreen>
       lowerBound: 0.95,
       upperBound: 1.0,
     );
+
     _scaleAnimation =
         CurvedAnimation(parent: _animationController, curve: Curves.easeOut);
   }
@@ -46,12 +52,39 @@ class _RegisterScreenState extends State<RegisterScreen>
     _animationController.dispose();
     emailController.dispose();
     passwordController.dispose();
-    firstNameController.dispose();
-    lastNameController.dispose();
     super.dispose();
   }
 
-  void register() async {
+  void checkPasswordStrength(String password) {
+    if (password.isEmpty) {
+      passwordStrength = '';
+      passwordStrengthColor = Colors.red;
+    } else if (password.length < 6) {
+      passwordStrength = 'Weak';
+      passwordStrengthColor = Colors.red;
+    } else {
+      int strengthPoints = 0;
+      if (RegExp(r'[A-Z]').hasMatch(password)) strengthPoints++;
+      if (RegExp(r'[a-z]').hasMatch(password)) strengthPoints++;
+      if (RegExp(r'[0-9]').hasMatch(password)) strengthPoints++;
+      if (RegExp(r'[!@#$%^&*(),.?":{}|<>]').hasMatch(password))
+        strengthPoints++;
+
+      if (strengthPoints <= 2) {
+        passwordStrength = 'Weak';
+        passwordStrengthColor = Colors.red;
+      } else if (strengthPoints == 3) {
+        passwordStrength = 'Medium';
+        passwordStrengthColor = Colors.orange;
+      } else {
+        passwordStrength = 'Strong';
+        passwordStrengthColor = Colors.green;
+      }
+    }
+    setState(() {});
+  }
+
+  Future<void> register() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => loading = true);
@@ -59,9 +92,6 @@ class _RegisterScreenState extends State<RegisterScreen>
     final data = {
       "email": emailController.text.trim(),
       "password": passwordController.text.trim(),
-      "first_name": firstNameController.text.trim(),
-      "last_name": lastNameController.text.trim(),
-      "role": "candidate",
     };
 
     final result = await AuthService.register(data);
@@ -77,10 +107,9 @@ class _RegisterScreenState extends State<RegisterScreen>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(errorMessage)),
       );
-      return; // Do NOT navigate
+      return;
     }
 
-    // SUCCESS: Only navigate on 201
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -99,7 +128,7 @@ class _RegisterScreenState extends State<RegisterScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // Background Image
+          // Background
           Container(
             decoration: const BoxDecoration(
               image: DecorationImage(
@@ -109,7 +138,7 @@ class _RegisterScreenState extends State<RegisterScreen>
             ),
           ),
 
-          // Logos at top-left and top-right
+          // Logos
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -131,7 +160,7 @@ class _RegisterScreenState extends State<RegisterScreen>
             ),
           ),
 
-          // Centered Content - Glass container removed
+          // Main Content
           Center(
             child: SingleChildScrollView(
               child: MouseRegion(
@@ -157,9 +186,10 @@ class _RegisterScreenState extends State<RegisterScreen>
                               color: Colors.white,
                               shadows: [
                                 Shadow(
-                                    color: Colors.black26,
-                                    blurRadius: 4,
-                                    offset: Offset(2, 2))
+                                  color: Colors.black26,
+                                  blurRadius: 4,
+                                  offset: Offset(2, 2),
+                                )
                               ],
                             ),
                           ),
@@ -167,26 +197,14 @@ class _RegisterScreenState extends State<RegisterScreen>
                           const Text(
                             "Register Account",
                             style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white),
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                           const SizedBox(height: 24),
-                          // Text Fields with transparent background
-                          CustomTextField(
-                            label: "First Name",
-                            controller: firstNameController,
-                            textColor: const Color.fromARGB(255, 183, 10, 10),
-                            backgroundColor: Colors.transparent,
-                          ),
-                          const SizedBox(height: 12),
-                          CustomTextField(
-                            label: "Last Name",
-                            controller: lastNameController,
-                            textColor: const Color.fromARGB(255, 188, 7, 7),
-                            backgroundColor: Colors.transparent,
-                          ),
-                          const SizedBox(height: 12),
+
+                          // Email
                           CustomTextField(
                             label: "Email",
                             controller: emailController,
@@ -195,35 +213,85 @@ class _RegisterScreenState extends State<RegisterScreen>
                             backgroundColor: Colors.transparent,
                           ),
                           const SizedBox(height: 12),
+
+                          // Password
                           CustomTextField(
                             label: "Password",
                             controller: passwordController,
                             inputType: TextInputType.visiblePassword,
+                            obscureText: _obscurePassword,
                             textColor: const Color.fromARGB(255, 199, 12, 12),
                             backgroundColor: Colors.transparent,
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_off
+                                    : Icons.visibility,
+                                color: const Color.fromARGB(255, 199, 12, 12),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                });
+                              },
+                            ),
+                            onChanged: checkPasswordStrength,
                           ),
+
+                          // Password strength indicator
+                          if (passwordStrength.isNotEmpty)
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(top: 4.0, bottom: 12),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Container(
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        color: passwordStrengthColor,
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    passwordStrength,
+                                    style:
+                                        TextStyle(color: passwordStrengthColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+
                           const SizedBox(height: 20),
-                          // Medium sized button
+
+                          // Register Button
                           SizedBox(
-                            width: 200, // Medium width
-                            height: 44, // Medium height
+                            width: 200,
+                            height: 44,
                             child: CustomButton(
                               text: "Register",
-                              onPressed: register,
+                              onPressed: loading ? null : register,
                             ),
                           ),
+
                           const SizedBox(height: 24),
+
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Text("Already have an account? ",
-                                  style: TextStyle(color: Colors.white70)),
+                              const Text(
+                                "Already have an account? ",
+                                style: TextStyle(color: Colors.white70),
+                              ),
                               GestureDetector(
                                 onTap: () {
                                   Navigator.pushReplacement(
                                     context,
                                     MaterialPageRoute(
-                                        builder: (_) => const LoginScreen()),
+                                      builder: (_) => const LoginScreen(),
+                                    ),
                                   );
                                 },
                                 child: const Text(
@@ -233,7 +301,9 @@ class _RegisterScreenState extends State<RegisterScreen>
                               ),
                             ],
                           ),
+
                           const SizedBox(height: 12),
+
                           IconButton(
                             icon: Icon(
                               themeProvider.isDarkMode
@@ -243,6 +313,7 @@ class _RegisterScreenState extends State<RegisterScreen>
                             ),
                             onPressed: () => themeProvider.toggleTheme(),
                           ),
+
                           const SizedBox(height: 16),
                         ],
                       ),
@@ -254,7 +325,9 @@ class _RegisterScreenState extends State<RegisterScreen>
           ),
 
           if (loading)
-            const Center(child: CircularProgressIndicator(color: Colors.white)),
+            const Center(
+              child: CircularProgressIndicator(color: Colors.white),
+            ),
         ],
       ),
     );

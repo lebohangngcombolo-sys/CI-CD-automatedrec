@@ -11,7 +11,7 @@ class SsoEnterpriseScreen extends StatelessWidget {
       'Okta': 'https://your-domain.okta.com',
       'Google Workspace': 'https://accounts.google.com',
       // Link to your backend SSO route
-      'Other SAML': 'https://ci-cd-automatedrec.onrender.com/api/auth/sso',
+      'Other SAML': 'http://127.0.0.1:5000/api/auth/sso',
     };
 
     final url = urls[provider];

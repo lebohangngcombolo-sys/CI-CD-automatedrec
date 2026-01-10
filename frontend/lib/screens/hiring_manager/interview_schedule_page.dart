@@ -35,7 +35,7 @@ class _ScheduleInterviewPageState extends State<ScheduleInterviewPage> {
   Future<void> fetchApplications() async {
     try {
       final res = await AuthService.authorizedGet(
-          "https://ci-cd-automatedrec.onrender.com/api/admin/applications?candidate_id=${widget.candidateId}");
+          "http://127.0.0.1:5000/api/admin/applications?candidate_id=${widget.candidateId}");
       if (res.statusCode == 200) {
         setState(() => applications = json.decode(res.body));
       } else {
@@ -94,8 +94,7 @@ class _ScheduleInterviewPageState extends State<ScheduleInterviewPage> {
 
     try {
       final res = await http.post(
-        Uri.parse(
-            "https://ci-cd-automatedrec.onrender.com/api/admin/interviews"),
+        Uri.parse("http://127.0.0.1:5000/api/admin/interviews"),
         headers: {
           "Content-Type": "application/json",
           "Authorization": "Bearer $token",
@@ -315,7 +314,7 @@ class _ScheduleInterviewPageState extends State<ScheduleInterviewPage> {
                                 ),
                                 const SizedBox(height: 12),
                                 DropdownButtonFormField<String>(
-                                  value: selectedApplication,
+                                  initialValue: selectedApplication,
                                   decoration: InputDecoration(
                                     labelText: "Select Job Application",
                                     border: OutlineInputBorder(
@@ -530,7 +529,7 @@ class _ScheduleInterviewPageState extends State<ScheduleInterviewPage> {
                                 ),
                                 const SizedBox(height: 16),
                                 DropdownButtonFormField<String>(
-                                  value: interviewType,
+                                  initialValue: interviewType,
                                   decoration: InputDecoration(
                                     labelText: "Interview Type",
                                     border: OutlineInputBorder(

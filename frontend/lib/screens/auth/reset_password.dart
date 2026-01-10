@@ -75,8 +75,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
 
     try {
       final res = await http.post(
-        Uri.parse(
-            "https://ci-cd-automatedrec.onrender.com/api/auth/reset-password"),
+        Uri.parse("http://127.0.0.1:5000/api/auth/reset-password"),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
           'token': token,
