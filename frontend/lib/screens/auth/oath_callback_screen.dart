@@ -50,6 +50,9 @@ class _OAuthCallbackScreenState extends State<OAuthCallbackScreen> {
             context.go('/enrollment?token=$accessToken');
           }
           break;
+        case 'hr':
+          context.go('/hr-dashboard?token=$accessToken');
+          break;
         default:
           context.go('/candidate-dashboard?token=$accessToken');
       }

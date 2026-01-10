@@ -2030,7 +2030,7 @@ class _ProfilePageState extends State<ProfilePage>
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: Colors.redAccent,
+            activeThumbColor: Colors.redAccent,
           ),
         ],
       ),

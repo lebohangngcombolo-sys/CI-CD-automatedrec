@@ -315,7 +315,7 @@ class _ScheduleInterviewPageState extends State<ScheduleInterviewPage> {
                                 ),
                                 const SizedBox(height: 12),
                                 DropdownButtonFormField<String>(
-                                  value: selectedApplication,
+                                  initialValue: selectedApplication,
                                   decoration: InputDecoration(
                                     labelText: "Select Job Application",
                                     border: OutlineInputBorder(
@@ -530,7 +530,7 @@ class _ScheduleInterviewPageState extends State<ScheduleInterviewPage> {
                                 ),
                                 const SizedBox(height: 16),
                                 DropdownButtonFormField<String>(
-                                  value: interviewType,
+                                  initialValue: interviewType,
                                   decoration: InputDecoration(
                                     labelText: "Interview Type",
                                     border: OutlineInputBorder(

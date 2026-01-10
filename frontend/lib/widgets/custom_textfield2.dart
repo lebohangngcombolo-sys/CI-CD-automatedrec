@@ -19,8 +19,10 @@ class CustomTextField extends StatelessWidget {
   final Color? labelColor;
   final Color? borderColor;
 
-  // ⭐ NEW: Accept custom border
   final InputBorder? border;
+
+  // ⭐ NEW: ADD THIS
+  final Widget? suffixIcon;
 
   const CustomTextField({
     super.key,
@@ -40,9 +42,10 @@ class CustomTextField extends StatelessWidget {
     this.style,
     this.labelColor,
     this.borderColor,
-
-    // ⭐ NEW parameter
     this.border,
+
+    // ⭐ NEW PARAMETER
+    this.suffixIcon,
   });
 
   @override
@@ -52,8 +55,6 @@ class CustomTextField extends StatelessWidget {
         color: backgroundColor ??
             const Color.fromARGB(0, 0, 0, 0).withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
-
-        // Only apply container border if NO custom border was passed
         border: border == null
             ? Border.all(
                 color: borderColor ?? Colors.white.withOpacity(0.3),
@@ -79,16 +80,18 @@ class CustomTextField extends StatelessWidget {
           labelStyle: TextStyle(
             color: labelColor ?? textColor?.withOpacity(0.7) ?? Colors.white70,
           ),
-
           hintText: hintText.isNotEmpty ? hintText : null,
           hintStyle: TextStyle(
             color: textColor?.withOpacity(0.5) ?? Colors.white54,
           ),
 
-          // ⭐ Apply the border you passed
+          // ⭐ Apply border from parameter
           border: border,
           enabledBorder: border,
           focusedBorder: border,
+
+          // ⭐ NEW: add suffixIcon here
+          suffixIcon: suffixIcon,
 
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

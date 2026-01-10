@@ -283,7 +283,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: role.isNotEmpty ? role : null,
+                      initialValue: role.isNotEmpty ? role : null,
                       items: roles
                           .map((r) => DropdownMenuItem(
                                 value: r,
@@ -524,7 +524,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> {
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: role,
+                    initialValue: role,
                     items: roles
                         .map((r) => DropdownMenuItem(
                               value: r,

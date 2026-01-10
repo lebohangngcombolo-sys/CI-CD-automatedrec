@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import '../../services/auth_service.dart';
 import 'assessment_page.dart';
@@ -979,7 +978,7 @@ class _JobDetailsPageState extends State<JobDetailsPage> {
               _socialIcon('assets/icons/Instagram1.png',
                   'https://www.instagram.com/yourprofile'),
               _socialIcon('assets/icons/x1.png', 'https://x.com/yourprofile'),
-              _socialIcon('assets/icons/LinkedIn1.png',
+              _socialIcon('assets/icons/Linkedin1.png',
                   'https://www.linkedin.com/in/yourprofile'),
               _socialIcon('assets/icons/facebook1.png',
                   'https://www.facebook.com/yourprofile'),

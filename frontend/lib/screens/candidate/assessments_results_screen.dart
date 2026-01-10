@@ -516,19 +516,20 @@ class _AssessmentResultsPageState extends State<AssessmentResultsPage> {
               child: Row(
                 children: [
                   IconButton(
-                      icon: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: _surfaceOverlay,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.arrow_back_ios_new_rounded,
-                            size: 18),
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: _surfaceOverlay,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                      onPressed: () {
-                        GoRouter.of(context)
-                            .pop(); // POP back to previous screen
-                      }),
+                      child: const Icon(Icons.arrow_back_ios_new_rounded,
+                          size: 18),
+                    ),
+                    onPressed: () {
+                      context.go(
+                          '/candidate-dashboard'); // Replace with your dashboard route name
+                    },
+                  ),
                   const SizedBox(width: 12),
                   Text(
                     "Assessment Results",

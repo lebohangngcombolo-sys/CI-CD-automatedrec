@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../auth/login_screen.dart';
+import '../../widgets/app_version.dart';
 
 class LandingPage extends StatelessWidget {
   const LandingPage({Key? key}) : super(key: key);
@@ -262,7 +263,7 @@ class LandingPage extends StatelessWidget {
                             'https://x.com/yourprofile',
                           ),
                           _socialIcon(
-                            'assets/icons/LinkedIn.png',
+                            'assets/icons/Linkedin.png',
                             'https://www.linkedin.com/in/yourprofile',
                           ),
                           _socialIcon(
@@ -337,6 +338,7 @@ class LandingPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      // Logo
                       Image.asset(
                         'assets/images/logo3.png',
                         width: 220,
@@ -344,32 +346,26 @@ class LandingPage extends StatelessWidget {
                         fit: BoxFit.contain,
                       ),
                       const SizedBox(height: 20),
+
+                      // Social Icons
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          _socialIcon(
-                            'assets/icons/Instagram1.png',
-                            'https://www.instagram.com/yourprofile',
-                          ),
-                          _socialIcon(
-                            'assets/icons/x1.png',
-                            'https://x.com/yourprofile',
-                          ),
-                          _socialIcon(
-                            'assets/icons/LinkedIn1.png',
-                            'https://www.linkedin.com/in/yourprofile',
-                          ),
-                          _socialIcon(
-                            'assets/icons/facebook1.png',
-                            'https://www.facebook.com/yourprofile',
-                          ),
-                          _socialIcon(
-                            'assets/icons/YouTube1.png',
-                            'https://www.youtube.com/yourchannel',
-                          ),
+                          _socialIcon('assets/icons/Instagram1.png',
+                              'https://www.instagram.com/yourprofile'),
+                          _socialIcon('assets/icons/x1.png',
+                              'https://x.com/yourprofile'),
+                          _socialIcon('assets/icons/Linkedin1.png',
+                              'https://www.linkedin.com/in/yourprofile'),
+                          _socialIcon('assets/icons/facebook1.png',
+                              'https://www.facebook.com/yourprofile'),
+                          _socialIcon('assets/icons/YouTube1.png',
+                              'https://www.youtube.com/yourchannel'),
                         ],
                       ),
                       const SizedBox(height: 20),
+
+                      // Copyright
                       Text(
                         "© 2025 Khonology. All rights reserved.",
                         style: GoogleFonts.poppins(
@@ -377,6 +373,10 @@ class LandingPage extends StatelessWidget {
                           fontSize: 12,
                         ),
                       ),
+                      const SizedBox(height: 4),
+
+                      // App Version
+                      AppVersion(), // dynamic version from backend
                     ],
                   ),
                 ),
@@ -384,7 +384,7 @@ class LandingPage extends StatelessWidget {
             ),
           ),
 
-          // Floating Chat Button
+          // -------------------- Floating Chat Button --------------------
           Positioned(
             right: 16,
             bottom: 16,

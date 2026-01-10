@@ -25,6 +25,7 @@ import 'job_management.dart';
 import 'user_management_screen.dart';
 import '../../providers/theme_provider.dart';
 import 'analytics_dashboard.dart';
+import 'offer_list_screen.dart';
 
 class AdminDAshboard extends StatefulWidget {
   final String token;
@@ -280,7 +281,8 @@ class _AdminDAshboardState extends State<AdminDAshboard>
               "${auditEndDate!.year}-${auditEndDate!.month.toString().padLeft(2, '0')}-${auditEndDate!.day.toString().padLeft(2, '0')}",
         if (auditSearchQuery != null) "q": auditSearchQuery!,
       };
-      final uri = Uri.http("127.0.0.1:5000", "/api/admin/audits", queryParams);
+      final uri = Uri.https(
+          "ci-cd-automatedrec.onrender.com", "/api/admin/audits", queryParams);
       final res =
           await http.get(uri, headers: {"Authorization": "Bearer $token"});
 
@@ -479,11 +481,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
                                         backgroundColor: Colors.grey.shade200,
                                         backgroundImage:
                                             _getProfileImageProvider(),
-                                        child:
-                                            _getProfileImageProvider() == null
-                                                ? const Icon(Icons.person,
-                                                    color: Colors.redAccent)
-                                                : null,
+                                        child: null,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
@@ -514,10 +512,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
                                       backgroundColor: Colors.grey.shade200,
                                       backgroundImage:
                                           _getProfileImageProvider(),
-                                      child: _getProfileImageProvider() == null
-                                          ? const Icon(Icons.person,
-                                              color: Colors.redAccent)
-                                          : null,
+                                      child: null,
                                     ),
                                   ),
                                 ),
@@ -650,7 +645,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
                                       onChanged: (value) {
                                         themeProvider.toggleTheme();
                                       },
-                                      activeColor: Colors.redAccent,
+                                      activeThumbColor: Colors.redAccent,
                                       inactiveTrackColor: Colors.grey.shade400,
                                     ),
                                   ],
@@ -731,24 +726,33 @@ class _AdminDAshboardState extends State<AdminDAshboard>
                                 const SizedBox(width: 8),
 
                                 TextButton.icon(
-                                  onPressed: () =>
-                                      setState(() => currentScreen = "jobs"),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) =>
+                                              AdminOfferListScreen()),
+                                    );
+                                  },
                                   icon: Image.asset(
-                                    // Changed from Icon to Image.asset
                                     'assets/icons/add.png',
                                     width: 30,
                                     height: 30,
                                     color:
                                         const Color.fromARGB(255, 193, 13, 0),
                                   ),
-                                  label: Text("Create",
-                                      style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          color: themeProvider.isDarkMode
-                                              ? Colors.white
-                                              : Colors.black87)),
+                                  label: Text(
+                                    "Create",
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      color: themeProvider.isDarkMode
+                                          ? Colors.white
+                                          : Colors.black87,
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
+
                                 IconButton(
                                   onPressed: () => setState(
                                       () => currentScreen = "notifications"),
@@ -771,10 +775,7 @@ class _AdminDAshboardState extends State<AdminDAshboard>
                                     radius: 18,
                                     backgroundColor: Colors.grey.shade200,
                                     backgroundImage: _getProfileImageProvider(),
-                                    child: _getProfileImageProvider() == null
-                                        ? const Icon(Icons.person,
-                                            color: Colors.redAccent)
-                                        : null,
+                                    child: null,
                                   ),
                                 ),
                               ],

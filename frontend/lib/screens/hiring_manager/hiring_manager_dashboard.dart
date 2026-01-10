@@ -9,11 +9,11 @@ import 'cv_reviews_screen.dart';
 import 'notifications_screen.dart';
 import 'job_management.dart';
 import 'interviews_list_screen.dart';
+import 'offer_list_screen.dart';
 import 'hm_analytics_page.dart';
 import 'hm_team_collaboration_page.dart';
 import 'package:http/http.dart' as http;
 
-import 'analytics_dashboard.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -25,6 +25,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../providers/theme_provider.dart';
 import '../auth/login_screen.dart';
+import 'pipeline_page.dart';
 
 class HMMainDashboard extends StatefulWidget {
   final String token;
@@ -487,11 +488,7 @@ class _HMMainDashboardState extends State<HMMainDashboard>
                                         backgroundColor: Colors.grey.shade200,
                                         backgroundImage:
                                             _getProfileImageProvider(),
-                                        child:
-                                            _getProfileImageProvider() == null
-                                                ? const Icon(Icons.person,
-                                                    color: Colors.redAccent)
-                                                : null,
+                                        child: null,
                                       ),
                                     ),
                                     const SizedBox(width: 12),
@@ -522,10 +519,7 @@ class _HMMainDashboardState extends State<HMMainDashboard>
                                       backgroundColor: Colors.grey.shade200,
                                       backgroundImage:
                                           _getProfileImageProvider(),
-                                      child: _getProfileImageProvider() == null
-                                          ? const Icon(Icons.person,
-                                              color: Colors.redAccent)
-                                          : null,
+                                      child: null,
                                     ),
                                   ),
                                 ),
@@ -658,7 +652,7 @@ class _HMMainDashboardState extends State<HMMainDashboard>
                                       onChanged: (value) {
                                         themeProvider.toggleTheme();
                                       },
-                                      activeColor: Colors.redAccent,
+                                      activeThumbColor: Colors.redAccent,
                                       inactiveTrackColor: Colors.grey.shade400,
                                     ),
                                   ],
@@ -672,7 +666,8 @@ class _HMMainDashboardState extends State<HMMainDashboard>
                                       context,
                                       MaterialPageRoute(
                                           builder: (context) =>
-                                              AnalyticsDashboard()),
+                                              RecruitmentPipelinePage(
+                                                  token: widget.token)),
                                     );
                                   },
                                   icon: Image.asset(
@@ -739,22 +734,30 @@ class _HMMainDashboardState extends State<HMMainDashboard>
                                 const SizedBox(width: 8),
 
                                 TextButton.icon(
-                                  onPressed: () =>
-                                      setState(() => currentScreen = "jobs"),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                          builder: (context) =>
+                                              AdminOfferListScreen()),
+                                    );
+                                  },
                                   icon: Image.asset(
-                                    // Changed from Icon to Image.asset
                                     'assets/icons/add.png',
                                     width: 30,
                                     height: 30,
                                     color:
                                         const Color.fromARGB(255, 193, 13, 0),
                                   ),
-                                  label: Text("Create",
-                                      style: TextStyle(
-                                          fontFamily: 'Poppins',
-                                          color: themeProvider.isDarkMode
-                                              ? Colors.white
-                                              : Colors.black87)),
+                                  label: Text(
+                                    "Create",
+                                    style: TextStyle(
+                                      fontFamily: 'Poppins',
+                                      color: themeProvider.isDarkMode
+                                          ? Colors.white
+                                          : Colors.black87,
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(width: 12),
                                 IconButton(
@@ -779,10 +782,7 @@ class _HMMainDashboardState extends State<HMMainDashboard>
                                     radius: 18,
                                     backgroundColor: Colors.grey.shade200,
                                     backgroundImage: _getProfileImageProvider(),
-                                    child: _getProfileImageProvider() == null
-                                        ? const Icon(Icons.person,
-                                            color: Colors.redAccent)
-                                        : null,
+                                    child: null,
                                   ),
                                 ),
                               ],

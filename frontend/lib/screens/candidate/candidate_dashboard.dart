@@ -15,11 +15,12 @@ import 'dart:typed_data';
 import '../../services/candidate_service.dart';
 import 'job_details_page.dart';
 import 'assessments_results_screen.dart';
-import '../../screens/candidate/user_profile_page.dart';
+import 'user_profile_page.dart';
 import 'jobs_applied_page.dart';
 import 'saved_application_screen.dart';
 import '../../services/auth_service.dart';
-import '../../screens/auth/login_screen.dart';
+import '../auth/login_screen.dart';
+import 'offers_screen.dart';
 
 class CandidateDashboard extends StatefulWidget {
   final String token;
@@ -733,7 +734,7 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                   SizedBox(width: 16),
                   Expanded(
                     child: DropdownButtonFormField(
-                      value: _selectedJobFilter,
+                      initialValue: _selectedJobFilter,
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.white,
@@ -755,7 +756,7 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                   SizedBox(width: 16),
                   Expanded(
                     child: DropdownButtonFormField(
-                      value: _selectedPlaceFilter,
+                      initialValue: _selectedPlaceFilter,
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.white,
@@ -868,6 +869,23 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                           );
                         },
                       ),
+                      // New Offers option
+                      PopupMenuItem(
+                        child: Text(
+                          'Offers',
+                          style: TextStyle(
+                              color: const Color.fromARGB(255, 116, 20, 13)),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  CandidateOffersScreen(), // create this screen
+                            ),
+                          );
+                        },
+                      ),
                     ],
                     child: Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
@@ -949,9 +967,7 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                       radius: 18,
                       backgroundColor: Colors.grey.shade200,
                       backgroundImage: _getProfileImageProvider(),
-                      child: _getProfileImageProvider() == null
-                          ? const Icon(Icons.person, color: Colors.redAccent)
-                          : null,
+                      child: null,
                     ),
                   ),
                   SizedBox(width: 16),
@@ -1178,7 +1194,7 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                               'https://www.instagram.com/yourprofile'),
                           _socialIcon('assets/icons/x1.png',
                               'https://x.com/yourprofile'),
-                          _socialIcon('assets/icons/LinkedIn1.png',
+                          _socialIcon('assets/icons/Linkedin1.png',
                               'https://www.linkedin.com/in/yourprofile'),
                           _socialIcon('assets/icons/facebook1.png',
                               'https://www.facebook.com/yourprofile'),
@@ -1449,15 +1465,19 @@ class _CandidateDashboardState extends State<CandidateDashboard>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Job Description",
-                  style:
-                      GoogleFonts.poppins(color: _textPrimary, fontSize: 12)),
+              // Job Description Label
+              Text(
+                "Job Description",
+                style: GoogleFonts.poppins(color: Colors.black, fontSize: 12),
+              ),
               const SizedBox(height: 6),
+
+              // Job Description Input
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
                       color: Colors.black12,
                       blurRadius: 4,
@@ -1468,26 +1488,33 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                 child: TextField(
                   controller: jobDescController,
                   maxLines: 3,
-                  style: GoogleFonts.poppins(color: _textPrimary, fontSize: 12),
+                  style: GoogleFonts.poppins(color: Colors.black, fontSize: 12),
                   decoration: InputDecoration(
                     hintText: "Paste position requirements here...",
                     hintStyle: GoogleFonts.poppins(
-                        color: _textSecondary, fontSize: 12),
+                      color: Colors.black.withOpacity(0.5),
+                      fontSize: 12,
+                    ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.all(12),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
-              Text("Professional CV",
-                  style:
-                      GoogleFonts.poppins(color: _textPrimary, fontSize: 12)),
+
+              // Professional CV Label
+              Text(
+                "Professional CV",
+                style: GoogleFonts.poppins(color: Colors.black, fontSize: 12),
+              ),
               const SizedBox(height: 6),
+
+              // CV Input
               Container(
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(8),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
                       color: Colors.black12,
                       blurRadius: 4,
@@ -1498,24 +1525,28 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                 child: TextField(
                   controller: cvController,
                   maxLines: 4,
-                  style: GoogleFonts.poppins(color: _textPrimary, fontSize: 12),
+                  style: GoogleFonts.poppins(color: Colors.black, fontSize: 12),
                   decoration: InputDecoration(
                     hintText: "Paste your professional CV here...",
                     hintStyle: GoogleFonts.poppins(
-                        color: _textSecondary, fontSize: 12),
+                      color: Colors.black.withOpacity(0.5),
+                      fontSize: 12,
+                    ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.all(12),
                   ),
                 ),
               ),
               const SizedBox(height: 12),
+
+              // Upload Button Row
               Row(
                 children: [
                   Container(
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
                           color: Colors.black12,
                           blurRadius: 4,
@@ -1533,14 +1564,16 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                           setState(() => uploadedResume = result.files.first);
                         }
                       },
-                      icon: Icon(Icons.upload_file,
-                          size: 14, color: _textPrimary),
-                      label: Text("Upload Resume",
-                          style: GoogleFonts.poppins(
-                              fontSize: 11, color: _textPrimary)),
+                      icon: const Icon(Icons.upload_file,
+                          size: 14, color: Colors.black),
+                      label: Text(
+                        "Upload Resume",
+                        style: GoogleFonts.poppins(
+                            fontSize: 11, color: Colors.black),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.transparent,
-                        foregroundColor: _textPrimary,
+                        foregroundColor: Colors.black,
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 6),
                       ),
@@ -1548,12 +1581,16 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                   ),
                   const SizedBox(width: 8),
                   if (uploadedResume != null)
-                    Text(uploadedResume!.name,
-                        style: GoogleFonts.poppins(
-                            color: _textSecondary, fontSize: 10)),
+                    Text(
+                      uploadedResume!.name,
+                      style: GoogleFonts.poppins(
+                          color: Colors.black.withOpacity(0.5), fontSize: 10),
+                    ),
                 ],
               ),
               const SizedBox(height: 12),
+
+              // Analyze Button
               Container(
                 decoration: BoxDecoration(
                   color: _accentRed.withOpacity(0.2),
@@ -1572,7 +1609,7 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                         },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
-                    foregroundColor: _textPrimary,
+                    foregroundColor: Colors.black,
                     minimumSize: const Size(double.infinity, 40),
                   ),
                   child: _isParsing
@@ -1580,22 +1617,29 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                           height: 16,
                           width: 16,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(_textPrimary)),
+                            strokeWidth: 2,
+                            valueColor:
+                                AlwaysStoppedAnimation<Color>(Colors.black),
+                          ),
                         )
-                      : Text("Analyze CV Compatibility",
+                      : Text(
+                          "Analyze CV Compatibility",
                           style: GoogleFonts.poppins(
-                              fontSize: 12, fontWeight: FontWeight.w500)),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.black),
+                        ),
                 ),
               ),
               const SizedBox(height: 12),
+
+              // CV Analysis Result
               if (cvAnalysisResult != null)
                 Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(8),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
                         color: Colors.black12,
                         blurRadius: 4,
@@ -1608,7 +1652,7 @@ class _CandidateDashboardState extends State<CandidateDashboard>
                     child: Text(
                       jsonEncode(cvAnalysisResult),
                       style: GoogleFonts.poppins(
-                          color: _textPrimary, fontSize: 10),
+                          color: Colors.black, fontSize: 10),
                     ),
                   ),
                 ),

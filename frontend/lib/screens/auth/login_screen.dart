@@ -15,6 +15,7 @@ import '../enrollment/enrollment_screen.dart';
 import '../admin/admin_dashboard.dart';
 import 'mfa_verification_screen.dart'; // 🆕 Import MFA screen
 import 'sso_enterprise_screen.dart'; // 🆕 Import SSO Enterprise screen
+import '../hr/hr_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -217,10 +218,15 @@ class _LoginScreenState extends State<LoginScreen>
     } else if (role == "hiring_manager") {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(
-            builder: (_) => HMMainDashboard(
-                  token: token,
-                )),
+        MaterialPageRoute(builder: (_) => HMMainDashboard(token: token)),
+      );
+    }
+
+    // 🆕 NEW HR ROLE SUPPORT
+    else if (role == "hr") {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => HRDashboard(token: token)),
       );
     } else if (role == "candidate" && dashboard == "/enrollment") {
       Navigator.pushReplacement(

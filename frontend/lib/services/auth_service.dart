@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,10 +14,16 @@ class AuthService {
   static Future<Map<String, dynamic>> register(
     Map<String, dynamic> data,
   ) async {
+    // Only keep email and password
+    final requestData = {
+      "email": data["email"],
+      "password": data["password"],
+    };
+
     final response = await http.post(
       Uri.parse(ApiEndpoints.register),
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode(data),
+      body: jsonEncode(requestData),
     );
 
     final body = jsonDecode(response.body);
@@ -243,18 +251,95 @@ class AuthService {
     return jsonDecode(response.body);
   }
 
-  // ----------------- COMPLETE ENROLLMENT -----------------
+  // ----------------- CV PARSING -----------------
+  static Future<Map<String, dynamic>> parseCV({
+    required String token,
+    required List<int> fileBytes,
+    required String fileName,
+  }) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse(ApiEndpoints.parserCV),
+      );
+
+      request.headers['Authorization'] = 'Bearer $token';
+
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'cv',
+          fileBytes,
+          filename: fileName,
+        ),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        return {
+          'error': 'Failed to parse CV: ${response.statusCode}',
+        };
+      }
+    } catch (e) {
+      return {'error': 'Error parsing CV: $e'};
+    }
+  }
+
+// ----------------- COMPLETE ENROLLMENT -----------------
   static Future<Map<String, dynamic>> completeEnrollment(
-      String token, Map<String, dynamic> data) async {
-    final response = await http.post(
-      Uri.parse(ApiEndpoints.enrollment),
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer $token",
-      },
-      body: jsonEncode(data),
-    );
-    return jsonDecode(response.body);
+    String token,
+    Map<String, dynamic> data, {
+    File? cvFile,
+  }) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse(ApiEndpoints.enrollment),
+      );
+
+      request.headers['Authorization'] = 'Bearer $token';
+
+      // --------------------
+      // Attach fields
+      // --------------------
+      data.forEach((key, value) {
+        if (value == null) return;
+
+        if (value is List || value is Map) {
+          request.fields[key] = jsonEncode(value);
+        } else {
+          request.fields[key] = value.toString();
+        }
+      });
+
+      // --------------------
+      // Optional CV upload
+      // --------------------
+      if (cvFile != null) {
+        request.files.add(
+          await http.MultipartFile.fromPath('cv', cvFile.path),
+        );
+      }
+
+      final streamedResponse = await request.send();
+      final responseBody = await streamedResponse.stream.bytesToString();
+
+      final decoded = jsonDecode(responseBody);
+
+      if (streamedResponse.statusCode == 200) {
+        return decoded;
+      } else {
+        return {
+          'error': 'Enrollment failed (${streamedResponse.statusCode})',
+          'details': decoded,
+        };
+      }
+    } catch (e) {
+      return {'error': 'Enrollment error: $e'};
+    }
   }
 
   // ----------------- ADMIN ENROLL USER -----------------

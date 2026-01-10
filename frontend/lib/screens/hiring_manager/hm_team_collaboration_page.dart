@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../constants/app_colors.dart';
-import '../../../providers/theme_provider.dart';
+import '../../constants/app_colors.dart';
+import '../../providers/theme_provider.dart';
 import '../../services/admin_service.dart';
 import 'meeting_screen.dart'; // ADD THIS IMPORT
 

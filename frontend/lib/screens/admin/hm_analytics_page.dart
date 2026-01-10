@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
-import '../../../constants/app_colors.dart';
+import '../../constants/app_colors.dart';
 import '../../widgets/widgets1/glass_card.dart';
 import '../../services/analytics_service.dart';
 
@@ -15,7 +15,8 @@ class _HMAnalyticsPageState extends State<HMAnalyticsPage> {
   bool _isLoading = true;
   String _selectedTimeRange = 'Last 6 Months';
   final AnalyticsService _service = AnalyticsService(
-      baseUrl: 'http://127.0.0.1:5000'); // <-- set your base URL
+      baseUrl:
+          'https://ci-cd-automatedrec.onrender.com'); // <-- set your base URL
 
   // Data holders
   Map<String, dynamic> _pipeline = {};
