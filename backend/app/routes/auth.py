@@ -730,12 +730,11 @@ def init_auth_routes(app):
                 password = ''.join(secrets.choice(string.ascii_letters + string.digits + "!@#$%^&*") for _ in range(12))
 
             # ---- Create user ----
-            user = AuthService.create_user(
+            user = AuthService.create_admin(
                 email=email,
                 password=password,
                 first_name=first_name,
-                last_name=last_name,
-                role=role
+                last_name=last_name
             )
             user.is_verified = True
             db.session.add(user)

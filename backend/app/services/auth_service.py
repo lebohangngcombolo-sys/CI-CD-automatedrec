@@ -288,3 +288,33 @@ class AuthService:
             db.session.rollback()
             logging.error(f"Failed to regenerate backup codes for user {user.id}: {e}")
             return False
+    @staticmethod
+    def create_admin(email: str, password: str, first_name: str = '', last_name: str = '', role: str = 'admin') -> User:
+        """
+        Create an admin user.
+        Names are stored inside the profile JSON.
+        """
+        user = User(
+            email=email.strip().lower(),
+            password=AuthService.hash_password(password),
+            role=role,
+            profile={
+                "first_name": first_name,
+                "last_name": last_name
+            }
+        )
+    
+        try:
+            db.session.add(user)
+            db.session.commit()
+            return user
+        except IntegrityError:
+            db.session.rollback()
+            raise ValueError("Email already exists")
+        except Exception as e:
+            db.session.rollback()
+            logging.exception("Failed to create admin user")
+            raise
+        
+    
+    
