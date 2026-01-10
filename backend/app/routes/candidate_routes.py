@@ -15,6 +15,9 @@ from app.utils.decorators import role_required
 from app.utils.helper import get_current_candidate
 from app.services.audit2 import AuditService
 import fitz
+from flask import jsonify, request, current_app
+import json
+import re
 
 
 
@@ -123,6 +126,7 @@ def get_available_jobs():
 
 
 # ----------------- UPLOAD RESUME -----------------
+# ----------------- UPLOAD RESUME -----------------
 @candidate_bp.route("/upload_resume/<int:application_id>", methods=["POST"])
 @role_required(["candidate"])
 def upload_resume(application_id):
@@ -176,20 +180,6 @@ def upload_resume(application_id):
             )
             db.session.add(notif)
         db.session.commit()
-        
-        # Audit log
-        AuditService.record_action(
-            admin_id=user_id,
-            action="Candidate Uploaded Resume",
-            target_user_id=user_id,
-            details=f"Uploaded resume for application ID {application_id}",
-            extra_data={
-                "application_id": application_id,
-                "job_id": job.id,
-                "cv_score": parser_result.get("match_score", 0),
-                "recommendation": parser_result.get("recommendation", "")
-            }
-        )
 
         return jsonify({
             "message": "Resume uploaded and analyzed",
@@ -254,15 +244,6 @@ def get_assessment(application_id):
             return jsonify({"error": "Unauthorized"}), 403
 
         result = AssessmentResult.query.filter_by(application_id=application.id).first()
-        # Audit log
-        AuditService.record_action(
-            admin_id=user_id,
-            action="Candidate Viewed Assessment",
-            target_user_id=user_id,
-            details=f"Viewed assessment for application ID {application_id}",
-            extra_data={"application_id": application_id, "job_title": application.requisition.title if application.requisition else None}
-        )
-
         return jsonify({
             "job_title": application.requisition.title if application.requisition else None,
             "assessment_pack": application.requisition.assessment_pack if application.requisition else {},
@@ -322,20 +303,6 @@ def submit_assessment(application_id):
         application.status = "assessment_submitted"
         application.assessed_date = datetime.utcnow()
         db.session.commit()
-        
-        # Audit log
-        AuditService.record_action(
-            admin_id=user_id,
-            action="Candidate Submitted Assessment",
-            target_user_id=user_id,
-            details=f"Submitted assessment for application ID {application_id}",
-            extra_data={
-                "application_id": application_id,
-                "assessment_score": percentage_score,
-                "overall_score": application.overall_score,
-                "recommendation": result.recommendation
-            }
-        )
 
         return jsonify({
             "message": "Assessment submitted",
@@ -370,6 +337,7 @@ def get_profile():
         return jsonify({"success": False, "message": "Internal server error"}), 500
 
 # ----------------- UPDATE PROFILE -----------------
+
 @candidate_bp.route("/profile", methods=["PUT"])
 @role_required(["candidate", "admin", "hiring_manager"])
 def update_profile():
@@ -392,19 +360,37 @@ def update_profile():
         data = request.get_json() or {}
 
         for key, value in data.items():
+            # Prevent email from being updated
+            if key == "email":
+                continue
+
             # Handle date fields
             if key == "dob":
                 if value:
                     try:
                         value = datetime.strptime(value, "%Y-%m-%d").date()
                     except ValueError:
-                        return jsonify({"success": False, "message": "Invalid date format"}), 400
+                        return jsonify({"success": False, "message": "Invalid date format, expected YYYY-MM-DD"}), 400
                 else:
                     value = None
 
+            # Validate ID number: must be 13 digits, numbers only
+            if key == "id_number":
+                if value:
+                    if not re.fullmatch(r"\d{13}", str(value)):
+                        return jsonify({"success": False, "message": "ID number must be exactly 13 digits"}), 400
+                    
+            # Validate phone number: must be exactly 10 digits, numbers only
+            if key == "phone":
+                if value:
+                    if not re.fullmatch(r"\d{10}", str(value)):
+                        return jsonify({
+                            "success": False,
+                            "message": "Phone number must be exactly 10 digits and contain numbers only"
+                        }), 400
+         
             # Handle JSON fields if sent as string
             if key in ["skills", "work_experience", "education", "certifications", "languages", "documents"] and isinstance(value, str):
-                import json
                 try:
                     value = json.loads(value)
                 except json.JSONDecodeError:
@@ -418,15 +404,6 @@ def update_profile():
                 setattr(user, key, value)
 
         db.session.commit()
-        
-        # Audit log
-        AuditService.record_action(
-            admin_id=user_id,
-            action="Candidate Updated Profile",
-            target_user_id=user_id,
-            details="Updated candidate profile information",
-            extra_data={"updated_fields": list(data.keys())}
-        )
 
         return jsonify({
             "success": True,
@@ -441,6 +418,7 @@ def update_profile():
         current_app.logger.error(f"Update profile error: {e}", exc_info=True)
         db.session.rollback()
         return jsonify({"success": False, "message": "Internal server error"}), 500
+
 
 
 # ----------------- UPLOAD DOCUMENT -----------------
@@ -468,15 +446,6 @@ def upload_document():
 
         candidate.cv_url = url
         db.session.commit()
-        
-        # Audit log
-        AuditService.record_action(
-            admin_id=user_id,
-            action="Candidate Uploaded Document",
-            target_user_id=user_id,
-            details="Uploaded candidate document",
-            extra_data={"document_type": filename.rsplit('.', 1)[1].lower(), "filename": filename}
-        )
 
         return jsonify({
             "success": True,
@@ -537,14 +506,6 @@ def upload_profile_picture():
         # ---- Save to candidate profile ----
         candidate.profile_picture = url
         db.session.commit()
-        
-        # Audit log
-        AuditService.record_action(
-            admin_id=user_id,
-            action="Candidate Uploaded Profile Picture",
-            target_user_id=user_id,
-            details="Uploaded new profile picture"
-        )
 
         return jsonify({
             "success": True,
@@ -572,15 +533,6 @@ def update_settings():
         user.settings = updated_settings
 
         db.session.commit()
-        
-        # Audit log
-        AuditService.record_action(
-            admin_id=user_id,
-            action="Candidate Updated Settings",
-            target_user_id=user_id,
-            details="Updated general settings",
-            extra_data={"updated_settings": list(data.keys())}
-        )
         return jsonify({
             "success": True,
             "message": "Settings updated successfully",
@@ -685,15 +637,6 @@ def deactivate_account():
 
         user.is_active = False
         db.session.commit()
-        
-        # Audit log
-        AuditService.record_action(
-            admin_id=user_id,
-            action="Candidate Deactivated Account",
-            target_user_id=user_id,
-            details="Candidate deactivated their account",
-            extra_data={"reason": reason}
-        )
 
         current_app.logger.info(f"User {user.email} deactivated account. Reason: {reason}")
         return jsonify({"success": True, "message": "Account deactivated successfully"}), 200
@@ -736,6 +679,7 @@ def get_candidate_notifications():
     except Exception as e:
         current_app.logger.error(f"Get notifications error: {str(e)}")
         return jsonify({'error': f'Failed to fetch notifications: {str(e)}'}), 500
+
 
 # ----------------- SAVE APPLICATION DRAFT -----------------
 @candidate_bp.route("/applications/<int:application_id>/draft", methods=["POST"])

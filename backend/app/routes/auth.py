@@ -1,4 +1,3 @@
-
 from flask import request, jsonify, current_app, redirect, url_for, make_response
 from flask_jwt_extended import (
     create_access_token,
@@ -13,10 +12,22 @@ from app.models import User, VerificationCode, OAuthConnection, Candidate
 from app.services.auth_service import AuthService
 from app.services.email_service import EmailService
 from app.services.audit2 import AuditService
+from app.services.file_text_extractor import extract_text_from_file
 from app.utils.decorators import role_required
 from datetime import datetime, timedelta
 import secrets
 import jwt  # ← ADD THIS IMPORT
+from app.utils.enrollment_schema import EnrollmentSchema
+from app.services.enrollment_service import EnrollmentService
+from app.services.ai_parser_service import analyse_resume_gemini
+from app.services.ai_cv_parser import AIParser
+from marshmallow import ValidationError
+from werkzeug.utils import secure_filename
+import os
+
+
+
+
 
 
 
@@ -26,7 +37,8 @@ import jwt  # ← ADD THIS IMPORT
 ROLE_DASHBOARD_MAP = {
     "admin": "/api/dashboard/admin",
     "hiring_manager": "/api/dashboard/hiring-manager",
-    "candidate": "/dashboard/candidate"
+    "candidate": "/dashboard/candidate",
+    "hr": "/api/dashboard/hr"   # ← ADDED
 }
 
 # OAuth providers config
@@ -52,6 +64,7 @@ OAUTH_PROVIDERS = {
 
 def init_auth_routes(app):
 
+    enrollment_schema = EnrollmentSchema()
     # ------------------- Initialize OAuth -------------------
     if not hasattr(app, "oauth_initialized"):
         oauth.init_app(app)
@@ -299,38 +312,49 @@ def init_auth_routes(app):
 
     # ------------------- REGISTER -------------------
     @app.route('/api/auth/register', methods=['POST'])
-    @limiter.limit("5 per minute")  # Add this line - stricter for registration
+    @limiter.limit("5 per minute")
     def register():
         try:
-            data = request.get_json()
+            data = request.get_json(silent=True)
+            if not data:
+                return jsonify({'error': 'Invalid or missing JSON body'}), 400
+
             email = data.get('email')
             password = data.get('password')
-            first_name = data.get('first_name')
-            last_name = data.get('last_name')
-            role = data.get('role', 'candidate')
-            
+
+            # Require only email + password
+            if not email or not password:
+                return jsonify({'error': 'Email and password are required'}), 400
+
+            email = email.strip().lower()
+
             # ---------------- Password Validation ----------------
             valid_password, errors = validator.validate(password)
-
             if not valid_password:
                 return jsonify({"errors": errors}), 400
             # -----------------------------------------------------
 
-            if role not in ROLE_DASHBOARD_MAP:
-                return jsonify({"error": "Invalid role"}), 400
-            if not all([email, password, first_name, last_name]):
-                return jsonify({'error': 'Missing required fields'}), 400
-
-            email = email.strip().lower()
-            if User.query.filter(db.func.lower(User.email) == email).first():
+            # Create user (role is forced internally)
+            try:
+                user = AuthService.create_user(email=email, password=password)
+            except ValueError:
                 return jsonify({'error': 'User already exists'}), 409
 
-            user = AuthService.create_user(email, password, first_name, last_name, role)
-
-            code = f"{secrets.randbelow(1000000):06d}"
+            # Generate verification code
+            code = f"{secrets.randbelow(1_000_000):06d}"
             expires_at = datetime.utcnow() + timedelta(minutes=30)
-            VerificationCode.query.filter_by(email=email, is_used=False).delete()
-            verification_code = VerificationCode(email=email, code=code, expires_at=expires_at)
+
+            VerificationCode.query.filter_by(
+                email=email,
+                is_used=False
+            ).delete()
+
+            verification_code = VerificationCode(
+                email=email,
+                code=code,
+                expires_at=expires_at
+            )
+
             db.session.add(verification_code)
             db.session.commit()
 
@@ -338,13 +362,15 @@ def init_auth_routes(app):
             AuditService.log(user_id=user.id, action="register")
 
             return jsonify({
-                'message': 'User registered successfully. Please check your email for verification code.',
-                'user_id': user.id
+                'message': 'User registered successfully. Please check your email for verification code.'
             }), 201
 
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f'Registration error: {str(e)}', exc_info=True)
+            current_app.logger.error(
+                f'Registration error: {str(e)}',
+                exc_info=True
+            )
             return jsonify({'error': 'Internal server error'}), 500
 
     # ------------------- VERIFY EMAIL -------------------
@@ -616,29 +642,55 @@ def init_auth_routes(app):
         current_user_id = int(get_jwt_identity())
         AuditService.log(user_id=current_user_id, action="view_candidate_dashboard")
         return jsonify({"message": "Welcome to the Candidate Dashboard"}), 200
+    
+    @app.route("/api/dashboard/hr", methods=["GET"])
+    @role_required("hr")
+    @limiter.limit("60 per minute")
+    def hr_dashboard():
+        current_user_id = int(get_jwt_identity())
+        AuditService.log(user_id=current_user_id, action="view_hr_dashboard")
+    
+        return jsonify({"message": "Welcome to the HR Dashboard"}), 200
+
 
     # ------------------- CANDIDATE ENROLLMENT -------------------
     @app.route("/api/candidate/enrollment", methods=["POST"])
     @role_required("candidate")
-    @limiter.limit("10 per minute")  # Add this line
+    @limiter.limit("5 per minute")
     def candidate_enrollment():
         try:
-            current_user_id = int(get_jwt_identity())
-            user = User.query.get(current_user_id)
-            data = request.get_json()
+            user_id = int(get_jwt_identity())
+            user = User.query.get(user_id)
+            if not user:
+                return jsonify({"error": "User not found"}), 404
 
-            user.profile.update(data)
-            user.enrollment_completed = True
-            db.session.commit()
+            # Accept multipart form
+            json_data = request.form.to_dict()  # manual fields from form
 
-            AuditService.log(user_id=user.id, action="complete_enrollment")
+            cv_file = request.files.get("cv")  # uploaded CV
+            if cv_file:
+                # Optionally save CV to server or cloud
+                filename = secure_filename(cv_file.filename)
+                save_path = os.path.join(current_app.config.get("UPLOAD_FOLDER", "/tmp"), filename)
+                cv_file.save(save_path)
 
-            return jsonify({"message": "Enrollment completed successfully"}), 200
+                # Pass file path to service
+                response, status = EnrollmentService.save_candidate_enrollment(
+                    user_id, json_data, cv_file=save_path
+                )
+            else:
+                # No CV uploaded
+                response, status = EnrollmentService.save_candidate_enrollment(
+                    user_id, json_data
+                )
+
+            return jsonify(response), status
 
         except Exception as e:
             db.session.rollback()
-            current_app.logger.error(f"Candidate enrollment error: {str(e)}", exc_info=True)
+            current_app.logger.error(f"Enrollment error: {str(e)}", exc_info=True)
             return jsonify({"error": "Internal server error"}), 500
+
 
     # ------------------- ADMIN ENROLLMENT -------------------
     import re, secrets, string
@@ -659,8 +711,9 @@ def init_auth_routes(app):
             if not all([email, role]):
                 return jsonify({"error": "Email and role are required"}), 400
 
-            if role not in ["admin", "hiring_manager"]:
-                return jsonify({"error": "Role must be admin or hiring_manager"}), 400
+            if role not in ["admin", "hiring_manager", "hr"]:
+                return jsonify({"error": "Role must be admin, hiring_manager, or hr"}), 400
+
 
             if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
                 return jsonify({"error": "Invalid email format"}), 400
@@ -752,4 +805,37 @@ def init_auth_routes(app):
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Change password error: {str(e)}", exc_info=True)
+            return jsonify({"error": "Internal server error"}), 500
+        
+    # ---------- OPTIONS (NO AUTH EVER) ----------
+    @app.route("/api/auth/cv/parse", methods=["OPTIONS"])
+    def parse_cv_options():
+        return "", 204
+
+
+    # ---------- POST (AUTH + ROLE) ----------
+    @app.route("/api/auth/cv/parse", methods=["POST"])
+    @jwt_required()
+    @role_required("candidate")
+    def parse_cv():
+    
+        try:
+            user_id = int(get_jwt_identity())
+
+            # Validate file upload
+            if "cv" not in request.files:
+                return jsonify({"error": "No CV uploaded"}), 400
+
+            cv_file = request.files["cv"]
+
+            # Use hybrid parser (Gemini + offline fallback)
+            extracted_data = AIParser.extract_cv_data(cv_file)
+
+            return jsonify(extracted_data), 200
+
+        except Exception as e:
+            current_app.logger.error(
+                f"CV parsing error for user {user_id if 'user_id' in locals() else 'unknown'}: {str(e)}",
+                exc_info=True
+            )
             return jsonify({"error": "Internal server error"}), 500
