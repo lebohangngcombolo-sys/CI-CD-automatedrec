@@ -195,6 +195,8 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
 
       - name: Build Frontend (Staging)
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }} 
         run: |
           cd frontend
           flutter build web --release \
@@ -203,6 +205,9 @@ jobs:
             --no-tree-shake-icons
 
       - name: Deploy Frontend to Netlify (Staging)
+        env:
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_STAGING_SITE_ID }}
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         run: |
           if [ -z "$NETLIFY_SITE_ID" ] || [ -z "$NETLIFY_AUTH_TOKEN" ]; then
             echo "⚠️ Netlify secrets not set. Skipping frontend deployment."
@@ -214,9 +219,7 @@ jobs:
             --site=$NETLIFY_SITE_ID \
             --auth=$NETLIFY_AUTH_TOKEN \
             --prod
-        env:
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_STAGING_SITE_ID }}
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        
 
 # -------------------------
 # CD: PRODUCTION DEPLOY
@@ -282,6 +285,8 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
 
       - name: Build Frontend (Production)
+        env:
+          APP_VERSION: ${{ env.APP_VERSION }}  # ✅ Pass APP_VERSION to the step
         run: |
           cd frontend
           flutter build web --release \
