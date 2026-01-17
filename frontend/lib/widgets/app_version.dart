@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 
 class AppVersion extends StatelessWidget {
-  const AppVersion({Key? key}) : super(key: key);
+  const AppVersion({super.key});
+
+  // Injected at build time via --dart-define
+  static const String _version =
+      String.fromEnvironment('APP_VERSION', defaultValue: 'unknown');
 
   @override
   Widget build(BuildContext context) {
-    // Read the version passed via --dart-define during CI/CD build
-    const version = String.fromEnvironment('APP_VERSION', defaultValue: 'unknown');
-
     return Text(
-      'Version: v$version',
+      'Version: v$_version',
       style: Theme.of(context)
           .textTheme
           .bodySmall
@@ -17,3 +18,4 @@ class AppVersion extends StatelessWidget {
     );
   }
 }
+
