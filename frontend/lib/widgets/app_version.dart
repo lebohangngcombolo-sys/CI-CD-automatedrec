@@ -1,32 +1,20 @@
 import 'package:flutter/material.dart';
-import '../services/version_service.dart';
 
-class AppVersion extends StatefulWidget {
-  const AppVersion({super.key});
-
-  @override
-  State<AppVersion> createState() => _AppVersionState();
-}
-
-class _AppVersionState extends State<AppVersion> {
-  String version = '...';
-
-  @override
-  void initState() {
-    super.initState();
-    VersionService.fetchBackendVersion().then((v) {
-      if (mounted) {
-        setState(() => version = v);
-      }
-    });
-  }
+class AppVersion extends StatelessWidget {
+  const AppVersion({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    // Read the version passed via --dart-define during CI/CD build
+    const version = String.fromEnvironment('APP_VERSION', defaultValue: 'unknown');
+
     return Text(
       'Version: v$version',
-      style:
-          Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+      style: Theme.of(context)
+          .textTheme
+          .bodySmall
+          ?.copyWith(color: Colors.grey),
     );
   }
 }
+
