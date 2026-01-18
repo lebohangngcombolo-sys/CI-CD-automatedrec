@@ -126,7 +126,13 @@ jobs:
         flutter pub get
 
     - name: Build Frontend (Validation Only)
-      run: cd frontend && flutter build web --release --no-wasm-dry-run
+      env:
+          APP_VERSION: ${{ env.APP_VERSION }}
+        run: |
+            cd frontend
+            flutter build web --release \
+            --dart-define=APP_VERSION=${APP_VERSION} \
+            --no-wasm-dry-run
 
 
 
