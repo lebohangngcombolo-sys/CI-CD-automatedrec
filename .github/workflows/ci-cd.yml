@@ -23,21 +23,8 @@ jobs:
     name: Backend CI
     runs-on: ubuntu-latest
 
+    # Removed local Postgres service
     services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: test_user
-          POSTGRES_PASSWORD: test_password
-          POSTGRES_DB: recruitment_test_db
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
       redis:
         image: redis:7-alpine
         options: >-
@@ -150,9 +137,9 @@ jobs:
           NETLIFY_STAGING_SITE_ID: ${{ secrets.NETLIFY_STAGING_SITE_ID }}
           NETLIFY_PROD_SITE_ID: ${{ secrets.NETLIFY_PROD_SITE_ID }}
 
+          # DATABASE_URL not needed here; migrations happen in the migrate job
         run: |
           python scripts/semantic_release.py
-
 
 # -------------------------
 # POST-DEPLOY: DATABASE MIGRATIONS
