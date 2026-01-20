@@ -126,30 +126,33 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Configure Git author
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install release dependencies
-        run: |
-          pip install requests
+        run: pip install requests
 
       - name: Run Semantic Release
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
 
-          # Render
           RENDER_STAGING_DEPLOY_HOOK: ${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}
           RENDER_PROD_DEPLOY_HOOK: ${{ secrets.RENDER_PROD_DEPLOY_HOOK }}
 
-          # Netlify
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_STAGING_SITE_ID: ${{ secrets.NETLIFY_STAGING_SITE_ID }}
           NETLIFY_PROD_SITE_ID: ${{ secrets.NETLIFY_PROD_SITE_ID }}
 
         run: |
           python scripts/semantic_release.py
+
 
 # -------------------------
 # POST-DEPLOY: DATABASE MIGRATIONS
