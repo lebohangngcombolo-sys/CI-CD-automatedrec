@@ -4,13 +4,13 @@ command = """
 bash -lc '
 set -e
 
-# Ensure VERSION exists
-if [ ! -f VERSION ]; then
-  echo "ERROR: VERSION file not found"
+# Ensure VERSION exists in repo root
+if [ ! -f ../VERSION ]; then
+  echo "ERROR: VERSION file not found in repo root"
   exit 1
 fi
 
-APP_VERSION=$(cat VERSION)
+APP_VERSION=$(cat ../VERSION)
 echo "Building frontend with version: $APP_VERSION"
 
 # Install Flutter if not cached
