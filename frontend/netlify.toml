@@ -2,6 +2,17 @@
 base = "frontend"
 command = """
 bash -lc '
+set -e
+
+# Ensure VERSION exists in repo root
+if [ ! -f ../VERSION ]; then
+  echo "ERROR: VERSION file not found in repo root"
+  exit 1
+fi
+
+APP_VERSION=$(cat ../VERSION)
+echo "Building frontend with version: $APP_VERSION"
+
 # Install Flutter if not cached
 if [ ! -d "$HOME/flutter" ]; then
   git clone https://github.com/flutter/flutter.git -b stable --depth 1 $HOME/flutter
@@ -12,23 +23,22 @@ export PATH="$HOME/flutter/bin:$PATH"
 flutter config --no-analytics
 flutter precache --web
 
-# Build the web app
-flutter build web --release
+# Build the web app WITH version injection
+flutter build web --release \
+  --dart-define=APP_VERSION=$APP_VERSION
 '
 """
 publish = "build/web"
 
 [build.environment]
 FLUTTER_WEB = "true"
-NODE_VERSION = "18"  # Optional, for Node dependencies
+NODE_VERSION = "18"
 
-# Optional: Configure redirects for SPA
 [[redirects]]
 from = "/*"
 to = "/index.html"
 status = 200
 
-# Optional: Configure headers
 [[headers]]
 for = "/*"
 [headers.values]
