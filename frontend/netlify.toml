@@ -4,14 +4,23 @@ command = """
 bash -lc '
 set -e
 
-# Ensure VERSION exists in repo root
+# Ensure VERSION exists in repo root (SemVer)
 if [ ! -f ../VERSION ]; then
   echo "ERROR: VERSION file not found in repo root"
   exit 1
 fi
 
-APP_VERSION=$(cat ../VERSION)
-echo "Building frontend with version: $APP_VERSION"
+SEMVER=$(cat ../VERSION)
+
+# Calendar version must come from Netlify env
+if [ -z "$APP_VERSION" ]; then
+  echo "ERROR: APP_VERSION (calendar version) not set"
+  exit 1
+fi
+
+echo "Building frontend with:"
+echo "  SemVer:   $SEMVER"
+echo "  CalVer:   $APP_VERSION"
 
 # Install Flutter if not cached
 if [ ! -d "$HOME/flutter" ]; then
@@ -23,25 +32,10 @@ export PATH="$HOME/flutter/bin:$PATH"
 flutter config --no-analytics
 flutter precache --web
 
-# Build the web app WITH version injection
+# Build the web app WITH dual version injection
 flutter build web --release \
+  --dart-define=APP_SEMVER=$SEMVER \
   --dart-define=APP_VERSION=$APP_VERSION
 '
 """
 publish = "build/web"
-
-[build.environment]
-FLUTTER_WEB = "true"
-NODE_VERSION = "18"
-
-[[redirects]]
-from = "/*"
-to = "/index.html"
-status = 200
-
-[[headers]]
-for = "/*"
-[headers.values]
-X-Frame-Options = "DENY"
-X-Content-Type-Options = "nosniff"
-Referrer-Policy = "strict-origin-when-cross-origin"
