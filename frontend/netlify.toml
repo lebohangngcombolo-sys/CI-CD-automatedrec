@@ -10,8 +10,23 @@ if [ ! -f ../VERSION ]; then
   exit 1
 fi
 
-APP_VERSION=$(cat ../VERSION)
-echo "Building frontend with version: $APP_VERSION"
+# Read SemVer from VERSION file
+SEMVER=$(cat ../VERSION)
+
+# Generate Calendar Version automatically: YYYY.MM.WW_DD_ENV
+# Example: 2026.01.AC1_DEV
+YEAR=$(date +%Y)
+MONTH=$(date +%m)
+WEEK_LETTER=$(printf "\x$(printf %x $(( $(date +%V) + 64 )) )")  # Week of year as letter
+DAY_LETTER=$(printf "\x$(printf %x $(( $(date +%u) + 64 )) )")   # Day of week as letter
+DAY_NUMBER=$(date +%d)
+ENVIRONMENT="DEV"  # Adjust automatically if needed (DEV/STAGING/PROD)
+
+CALVER="${YEAR}.${MONTH}.${WEEK_LETTER}${DAY_LETTER}${DAY_NUMBER}_${ENVIRONMENT}"
+
+echo "Building frontend with versions:"
+echo "  SemVer: $SEMVER"
+echo "  CalVer: $CALVER"
 
 # Install Flutter if not cached
 if [ ! -d "$HOME/flutter" ]; then
@@ -23,9 +38,10 @@ export PATH="$HOME/flutter/bin:$PATH"
 flutter config --no-analytics
 flutter precache --web
 
-# Build the web app WITH version injection
+# Build the web app with both version defines
 flutter build web --release \
-  --dart-define=APP_VERSION=$APP_VERSION
+  --dart-define=APP_SEMVER=$SEMVER \
+  --dart-define=APP_VERSION=$CALVER
 '
 """
 publish = "build/web"

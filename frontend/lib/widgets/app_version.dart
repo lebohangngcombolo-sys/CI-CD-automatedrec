@@ -3,15 +3,22 @@ import 'package:flutter/material.dart';
 class AppVersion extends StatelessWidget {
   const AppVersion({super.key});
 
-  static const String _version = String.fromEnvironment(
+  // Calendar version (date + env)
+  static const String calver = String.fromEnvironment(
     'APP_VERSION',
     defaultValue: 'unknown',
   );
 
+  // Semantic version
+  static const String semver = String.fromEnvironment(
+    'APP_SEMVER',
+    defaultValue: '0.0.0',
+  );
+
   @override
   Widget build(BuildContext context) {
-    final isDev = _version.contains('_DEV');
-    final isStaging = _version.contains('_STAGING');
+    final isDev = calver.contains('_DEV');
+    final isStaging = calver.contains('_STAGING');
 
     final color = isDev
         ? Colors.orange
@@ -20,7 +27,7 @@ class AppVersion extends StatelessWidget {
         : Colors.green;
 
     return Text(
-      'Version: v$_version',
+      'Version: v$semver ($calver)',
       style: const TextStyle(fontSize: 12).copyWith(color: color),
     );
   }
