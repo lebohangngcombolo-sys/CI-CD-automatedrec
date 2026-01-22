@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class AppVersion extends StatelessWidget {
   const AppVersion({super.key});
 
@@ -19,7 +21,7 @@ class AppVersion extends StatelessWidget {
 
     return Text(
       'Version: v$_version',
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: color),
+      style: const TextStyle(fontSize: 12).copyWith(color: color),
     );
   }
 }
