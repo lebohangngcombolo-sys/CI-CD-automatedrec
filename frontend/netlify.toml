@@ -17,10 +17,16 @@ SEMVER=$(cat ../VERSION)
 # Example: 2026.01.AC1_DEV
 YEAR=$(date +%Y)
 MONTH=$(date +%m)
-WEEK_LETTER=$(printf "\x$(printf %x $(( $(date +%V) + 64 )) )")  # Week of year as letter
-DAY_LETTER=$(printf "\x$(printf %x $(( $(date +%u) + 64 )) )")   # Day of week as letter
 DAY_NUMBER=$(date +%d)
 ENVIRONMENT="DEV"  # Adjust automatically if needed (DEV/STAGING/PROD)
+
+# Map week number and day number to letters
+WEEK_LETTERS=(A B C D E F G H I J K L M N O P Q R S T U V W X Y Z)
+DAY_LETTERS=(A B C D E F G)
+WEEK_INDEX=$(( $(date +%V) - 1 ))
+DAY_INDEX=$(( $(date +%u) - 1 ))
+WEEK_LETTER=${WEEK_LETTERS[$WEEK_INDEX]}
+DAY_LETTER=${DAY_LETTERS[$DAY_INDEX]}
 
 CALVER="${YEAR}.${MONTH}.${WEEK_LETTER}${DAY_LETTER}${DAY_NUMBER}_${ENVIRONMENT}"
 
