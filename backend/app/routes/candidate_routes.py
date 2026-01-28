@@ -7,7 +7,7 @@ import cloudinary.uploader
 from app.models import (
     User, Candidate, Requisition, Application, AssessmentResult, Notification, AuditLog
 )
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
 
 from app.services.cv_parser_service import HybridResumeAnalyzer
@@ -359,16 +359,72 @@ def update_profile():
         user = candidate.user
         data = request.get_json() or {}
 
+        # Rate limiting/update frequency check
+        last_updated = candidate.updated_at if hasattr(candidate, 'updated_at') else None
+        if last_updated:
+            time_since_last_update = datetime.utcnow() - last_updated
+            if time_since_last_update.total_seconds() < 30:  # 30 seconds cooldown
+                return jsonify({
+                    "success": False, 
+                    "message": "Please wait 30 seconds between profile updates"
+                }), 429
+
         for key, value in data.items():
             # Prevent email from being updated
             if key == "email":
                 continue
+
+            # Basic input sanitization for all string fields
+            if isinstance(value, str):
+                # Remove script tags and dangerous HTML
+                value = re.sub(r'<script.*?>.*?</script>', '', value, flags=re.IGNORECASE | re.DOTALL)
+                value = re.sub(r'javascript:', '', value, flags=re.IGNORECASE)
+                # Trim whitespace
+                value = value.strip()
+
+            # General length validation for text fields
+            if isinstance(value, str) and key not in ["skills", "work_experience", "education", "certifications", "languages", "documents"]:
+                if len(value) > 500:  # Reasonable default max length
+                    return jsonify({"success": False, "message": f"{key} is too long (maximum 500 characters)"}), 400
+
+            # Type validation for non-JSON fields
+            if key not in ["skills", "work_experience", "education", "certifications", "languages", "documents", "dob", "id_number", "phone"]:
+                if value is not None and not isinstance(value, (str, int, float, bool, type(None))):
+                    return jsonify({"success": False, "message": f"Invalid data type for {key}"}), 400
+
+            # Numeric field validation
+            if key in ["years_experience", "expected_salary", "current_salary"] and value is not None:
+                try:
+                    num_value = float(value)
+                    if num_value < 0:
+                        return jsonify({"success": False, "message": f"{key} cannot be negative"}), 400
+                    if num_value > 10000000:  # Reasonable maximum
+                        return jsonify({"success": False, "message": f"{key} value is too high"}), 400
+                    value = num_value  # Convert to proper numeric type
+                except (ValueError, TypeError):
+                    return jsonify({"success": False, "message": f"{key} must be a valid number"}), 400
 
             # Handle date fields
             if key == "dob":
                 if value:
                     try:
                         value = datetime.strptime(value, "%Y-%m-%d").date()
+                        
+                        # Additional date validations
+                        # Ensure DOB is not in future
+                        if value > datetime.now().date():
+                            return jsonify({"success": False, "message": "Date of birth cannot be in the future"}), 400
+                        
+                        # Ensure reasonable age (at least 16 years old)
+                        min_age_date = datetime.now().date() - timedelta(days=365*16)
+                        if value > min_age_date:
+                            return jsonify({"success": False, "message": "Candidate must be at least 16 years old"}), 400
+                        
+                        # Not too old (100 years max)
+                        max_age_date = datetime.now().date() - timedelta(days=365*100)
+                        if value < max_age_date:
+                            return jsonify({"success": False, "message": "Please enter a valid date of birth"}), 400
+                            
                     except ValueError:
                         return jsonify({"success": False, "message": "Invalid date format, expected YYYY-MM-DD"}), 400
                 else:
@@ -377,24 +433,134 @@ def update_profile():
             # Validate ID number: must be 13 digits, numbers only
             if key == "id_number":
                 if value:
-                    if not re.fullmatch(r"\d{13}", str(value)):
+                    # Ensure it's a string for regex matching
+                    id_str = str(value)
+                    if not re.fullmatch(r"\d{13}", id_str):
                         return jsonify({"success": False, "message": "ID number must be exactly 13 digits"}), 400
                     
+                    # Optional: Basic SA ID validation (check date within ID)
+                    try:
+                        year_prefix = "19" if int(id_str[0:2]) < 50 else "20"
+                        birth_date_str = f"{year_prefix}{id_str[0:2]}-{id_str[2:4]}-{id_str[4:6]}"
+                        datetime.strptime(birth_date_str, "%Y-%m-%d")
+                    except ValueError:
+                        current_app.logger.warning(f"Invalid birth date in ID number: {id_str}")
+                        # Log but don't reject - some edge cases might be valid
+
             # Validate phone number: must be exactly 10 digits, numbers only
             if key == "phone":
                 if value:
-                    if not re.fullmatch(r"\d{10}", str(value)):
+                    # Clean the phone number (remove spaces, dashes, etc.)
+                    cleaned_value = re.sub(r'[\s\-\(\)]', '', str(value))
+                    if not re.fullmatch(r"\d{10}", cleaned_value):
                         return jsonify({
                             "success": False,
                             "message": "Phone number must be exactly 10 digits and contain numbers only"
                         }), 400
-         
+                    
+                    # Update value to cleaned version
+                    value = cleaned_value
+                    
+                    # Optional: Check if it starts with valid SA prefix
+                    valid_prefixes = ["0", "27"]
+                    if not any(cleaned_value.startswith(prefix) for prefix in valid_prefixes):
+                        current_app.logger.info(f"Phone number may not be valid SA format: {cleaned_value}")
+
             # Handle JSON fields if sent as string
-            if key in ["skills", "work_experience", "education", "certifications", "languages", "documents"] and isinstance(value, str):
-                try:
-                    value = json.loads(value)
-                except json.JSONDecodeError:
-                    value = []
+            if key in ["skills", "work_experience", "education", "certifications", "languages", "documents"]:
+                if isinstance(value, str):
+                    try:
+                        value = json.loads(value)
+                    except json.JSONDecodeError:
+                        value = []
+                
+                # Additional JSON structure validation
+                if value:
+                    # Ensure it's a list for array fields
+                    if key in ["skills", "languages"] and not isinstance(value, list):
+                        return jsonify({"success": False, "message": f"{key} must be a list"}), 400
+                    
+                    # Validate work_experience structure
+                    if key == "work_experience" and isinstance(value, list):
+                        for exp in value:
+                            if not isinstance(exp, dict):
+                                return jsonify({"success": False, "message": "Each work experience must be an object"}), 400
+                            # Validate company name length if present
+                            if exp.get("company") and len(str(exp["company"])) > 200:
+                                return jsonify({"success": False, "message": "Company name too long (max 200 characters)"}), 400
+                    
+                    # Validate education structure
+                    if key == "education" and isinstance(value, list):
+                        for edu in value:
+                            if not isinstance(edu, dict):
+                                return jsonify({"success": False, "message": "Each education entry must be an object"}), 400
+                            if edu.get("institution") and len(str(edu["institution"])) > 200:
+                                return jsonify({"success": False, "message": "Institution name too long (max 200 characters)"}), 400
+                    
+                    # Limit array size to prevent abuse
+                    if isinstance(value, list) and len(value) > 100:
+                        return jsonify({"success": False, "message": f"Too many items in {key}, maximum is 100"}), 400
+                    
+                    # Validate individual item lengths in lists
+                    if isinstance(value, list):
+                        for item in value:
+                            if isinstance(item, str) and len(item) > 200:
+                                return jsonify({"success": False, "message": f"Item in {key} too long (max 200 characters)"}), 400
+
+            # Enum/Predefined value validation
+            if key == "gender" and value:
+                valid_genders = ["male", "female", "other", "prefer_not_to_say"]
+                if str(value).lower() not in valid_genders:
+                    return jsonify({"success": False, "message": f"Gender must be one of: {', '.join(valid_genders)}"}), 400
+                value = value.lower()  # Normalize case
+
+            if key == "marital_status" and value:
+                valid_statuses = ["single", "married", "divorced", "widowed", "other"]
+                if str(value).lower() not in valid_statuses:
+                    return jsonify({"success": False, "message": f"Marital status must be one of: {', '.join(valid_statuses)}"}), 400
+                value = value.lower()  # Normalize case
+
+            # Field-specific format validation
+            if key == "postal_code" and value:
+                if not re.fullmatch(r"\d{4}", str(value)):
+                    return jsonify({"success": False, "message": "Postal code must be exactly 4 digits"}), 400
+
+            if key == "linkedin_url" and value:
+                if not re.match(r'^https?://(www\.)?linkedin\.com/.*', str(value), re.IGNORECASE):
+                    return jsonify({"success": False, "message": "Please provide a valid LinkedIn URL (must be linkedin.com)"}), 400
+                if len(str(value)) > 500:
+                    return jsonify({"success": False, "message": "LinkedIn URL too long (maximum 500 characters)"}), 400
+
+            if key == "website" and value:
+                if not re.match(r'^https?://', str(value), re.IGNORECASE):
+                    return jsonify({"success": False, "message": "Website must start with http:// or https://"}), 400
+                if len(str(value)) > 500:
+                    return jsonify({"success": False, "message": "Website URL too long (maximum 500 characters)"}), 400
+
+            # Name field validation
+            if key in ["first_name", "last_name", "city", "country", "province"] and value:
+                if not isinstance(value, str):
+                    return jsonify({"success": False, "message": f"{key} must be a string"}), 400
+                if len(value) > 100:
+                    return jsonify({"success": False, "message": f"{key} cannot exceed 100 characters"}), 400
+                # Prevent only whitespace
+                if value.strip() == "":
+                    return jsonify({"success": False, "message": f"{key} cannot be empty or whitespace"}), 400
+                # Basic name validation (letters, spaces, hyphens, apostrophes)
+                if not re.match(r'^[A-Za-z\s\-\'\.]+$', value):
+                    current_app.logger.warning(f"Unusual characters in {key}: {value}")
+
+            # Address field validation
+            if key == "address" and value:
+                if len(str(value)) > 255:
+                    return jsonify({"success": False, "message": "Address cannot exceed 255 characters"}), 400
+
+            # Blacklist/forbidden values check (for names)
+            if key in ["first_name", "last_name"] and value:
+                forbidden_terms = ["admin", "root", "system", "null", "undefined", "test", "fake"]
+                if any(term in str(value).lower() for term in forbidden_terms):
+                    current_app.logger.warning(f"Potential invalid {key}: {value}")
+                    # Don't reject, just log - might be legitimate
 
             # Update Candidate attributes
             if hasattr(candidate, key):
@@ -402,6 +568,12 @@ def update_profile():
             # Update User attributes if they exist on User
             elif hasattr(user, key):
                 setattr(user, key, value)
+
+        # Set update timestamp if field exists
+        if hasattr(candidate, 'updated_at'):
+            candidate.updated_at = datetime.utcnow()
+        if hasattr(user, 'updated_at'):
+            user.updated_at = datetime.utcnow()
 
         db.session.commit()
 
@@ -418,7 +590,6 @@ def update_profile():
         current_app.logger.error(f"Update profile error: {e}", exc_info=True)
         db.session.rollback()
         return jsonify({"success": False, "message": "Internal server error"}), 500
-
 
 
 # ----------------- UPLOAD DOCUMENT -----------------
