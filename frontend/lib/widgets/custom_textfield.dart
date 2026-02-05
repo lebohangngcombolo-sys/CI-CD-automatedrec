@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class CustomTextField extends StatelessWidget {
   final String label;
@@ -42,9 +43,10 @@ class CustomTextField extends StatelessWidget {
   final TextAlignVertical? textAlignVertical;
   final bool enableInteractiveSelection;
   final TextCapitalization textCapitalization;
+  final List<TextInputFormatter>? inputFormatters; // ✅ added
 
   const CustomTextField({
-    super.key,
+    Key? key,
     required this.label,
     this.controller,
     this.initialValue,
@@ -52,6 +54,7 @@ class CustomTextField extends StatelessWidget {
     this.inputType = TextInputType.text,
     this.maxLines = 1,
     this.onChanged,
+    this.inputFormatters,
     this.onSubmitted,
     this.validator,
     this.backgroundColor,
@@ -86,17 +89,16 @@ class CustomTextField extends StatelessWidget {
     this.textAlignVertical,
     this.enableInteractiveSelection = true,
     this.textCapitalization = TextCapitalization.none,
-  });
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Default colors based on theme
+    // Default colors
     final defaultBackgroundColor =
         isDark ? Colors.grey.shade900.withOpacity(0.7) : Colors.white;
-
     final defaultTextColor = isDark ? Colors.white : Colors.black87;
     final defaultLabelColor =
         isDark ? Colors.grey.shade400 : Colors.grey.shade700;
@@ -134,7 +136,7 @@ class CustomTextField extends StatelessWidget {
                       padding: const EdgeInsets.only(left: 4),
                       child: Text(
                         '*',
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: Colors.redAccent,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -144,7 +146,6 @@ class CustomTextField extends StatelessWidget {
                 ],
               ),
             ),
-
           TextFormField(
             controller: controller,
             initialValue: initialValue,
@@ -167,6 +168,7 @@ class CustomTextField extends StatelessWidget {
             textAlignVertical: textAlignVertical,
             enableInteractiveSelection: enableInteractiveSelection,
             textCapitalization: textCapitalization,
+            inputFormatters: inputFormatters, // ✅ forward here
             style: TextStyle(
               color: textColor ?? defaultTextColor,
               fontSize: 16,
@@ -264,23 +266,21 @@ class CustomTextField extends StatelessWidget {
             cursorWidth: 1.5,
             cursorRadius: const Radius.circular(2),
           ),
-
           // Character counter (optional)
-          if (maxLength != null && showCounter)
+          if (maxLength != null && showCounter && controller != null)
             Padding(
               padding: const EdgeInsets.only(top: 4, right: 4),
               child: Align(
                 alignment: Alignment.centerRight,
-                child: ValueListenableBuilder(
+                child: ValueListenableBuilder<TextEditingValue>(
                   valueListenable: controller!,
                   builder: (context, value, child) {
-                    final text = value.text;
-                    final length = text.length;
+                    final textLength = value.text.length;
                     return Text(
-                      counterText ?? '$length/$maxLength',
+                      counterText ?? '$textLength/$maxLength',
                       style: TextStyle(
                         fontSize: 12,
-                        color: length > maxLength!
+                        color: textLength > maxLength!
                             ? Colors.redAccent
                             : hintColor ?? defaultHintColor,
                         fontWeight: FontWeight.w400,
